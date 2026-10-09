@@ -90,6 +90,12 @@ export const ExternalIcon = (p: P) => (
   </Base>
 )
 
+export const CoffeeIcon = (p: P) => (
+  <Base {...p}>
+    <path d="M4 9h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9zM16 10.5h1.5a2.5 2.5 0 0 1 0 5H16M8 3.5c0 1 1 1.5 1 2.5M12 3.5c0 1 1 1.5 1 2.5" />
+  </Base>
+)
+
 export function Spinner({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" width={20} height={20} className={`animate-spin ${className}`} aria-label="Loading">

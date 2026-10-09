@@ -18,6 +18,7 @@ import {
   useTmdbKey,
 } from '../lib/tmdb'
 import { Button, ScreenHeader } from '../components/Layout'
+import { CoffeeIcon } from '../components/Icons'
 import { TmdbKeyForm, TmdbKeyHelp } from '../components/TmdbKeyForm'
 
 const REMIND_AFTER_DAYS = 14
@@ -148,6 +149,18 @@ export function Settings() {
         <StorageSection />
 
         <Section title="About">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <p className="text-[15px]">Made by 16bithill</p>
+            <a
+              href="https://buymeacoffee.com/calebhill"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-neutral-100 px-3.5 text-sm font-medium text-neutral-900 active:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:active:bg-neutral-700"
+            >
+              <CoffeeIcon width={18} height={18} />
+              Buy me a coffee
+            </a>
+          </div>
           <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
             This product uses the TMDB API but is not endorsed or certified by TMDB.{' '}
             <a className="text-accent-text" href="https://www.themoviedb.org/" target="_blank" rel="noreferrer">
