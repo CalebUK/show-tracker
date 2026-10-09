@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { Show } from '../db'
 import { episodeLabel, formatAirTime, groupUpcoming, type UpcomingGroups, type UpcomingRow } from '../lib/dates'
-import { nextSeasonNote, type Progress } from '../lib/progress'
+import { isFinished, nextSeasonNote, type Progress } from '../lib/progress'
 import { refreshFollowed, refreshStore } from '../lib/shows'
 import { setWatched } from '../lib/watched'
 import { getTmdbKey } from '../lib/tmdb'
@@ -41,8 +41,10 @@ export function Upcoming() {
   const data = useMemo(() => {
     if (!library) return null
     const { followed, upcoming, scheduled, progress } = library
-    const offAir = followed.filter((s) => !scheduled.has(s.tmdb_id))
     const p = (s: Show) => progress.get(s.tmdb_id)!
+    // Finished shows (ended and fully watched) are done; they live under Shows → Finished instead.
+    const unscheduled = followed.filter((s) => !scheduled.has(s.tmdb_id))
+    const offAir = unscheduled.filter((s) => !isFinished(s, p(s)))
     return {
       groups: groupUpcoming(upcoming, new Map(followed.map((s) => [s.tmdb_id, s])), now),
       upNext: offAir
@@ -51,6 +53,7 @@ export function Upcoming() {
       notStarted: offAir.filter((s) => !p(s).started),
       caughtUp: offAir.filter((s) => p(s).caughtUp),
       offAirCount: offAir.length,
+      finishedCount: unscheduled.length - offAir.length,
     }
   }, [library, now])
 
@@ -156,8 +159,9 @@ export function Upcoming() {
             )}
             {data.offAirCount === 0 && (
               <Notice>
-                Every show you follow has episodes on the schedule. Shows with nothing scheduled appear here with your next
-                unwatched episode.
+                {data.finishedCount > 0
+                  ? "Nothing to catch up on. Shows you've finished are in the Shows tab under Finished."
+                  : 'Every show you follow has episodes on the schedule. Shows with nothing scheduled appear here with your next unwatched episode.'}
               </Notice>
             )}
           </div>

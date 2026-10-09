@@ -7,10 +7,11 @@ import { BUCKETS, removeRanking, sortRankings } from '../lib/ranking'
 import { episodeLabel, formatAirTime, formatDateOnly } from '../lib/dates'
 import { navigate } from '../lib/router'
 import { errorMessage, toast } from '../lib/toast'
-import { Button, Overlay } from '../components/Layout'
+import { Button, Overlay, Switch } from '../components/Layout'
 import { Poster } from '../components/Poster'
 import { EpisodeList } from '../components/EpisodeList'
-import { nextSeasonNote } from '../lib/progress'
+import { isAired, nextSeasonNote } from '../lib/progress'
+import { setWatched } from '../lib/watched'
 import { CheckIcon, ExternalIcon, PlusIcon, Spinner } from '../components/Icons'
 
 /** Subscription services come first, so the first few are the useful ones. */
@@ -82,6 +83,26 @@ export function ShowDetail({ id }: { id: number }) {
   const unrank = async () => {
     await removeRanking(id)
     toast('Removed from rankings')
+  }
+
+  /** For a show you don't follow yet: follow it (which loads its episode list) and tick every aired episode. */
+  const watchAll = async () => {
+    setBusy(true)
+    try {
+      await follow(id)
+      const now = new Date()
+      const aired = (await db.episodes.where('tmdb_show_id').equals(id).toArray()).filter((e) => isAired(e, now))
+      if (!aired.length) {
+        toast(`Following ${show.name}, but there's no episode list to tick yet`)
+        return
+      }
+      await setWatched(aired, true)
+      toast(`Watched all ${aired.length} episodes of ${show.name}`)
+    } catch (err) {
+      toast(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const toggleOwned = async (field: 'own_dvd' | 'own_streaming', value: boolean) => {
@@ -181,7 +202,13 @@ export function ShowDetail({ id }: { id: number }) {
         ) : (
           <section className="mt-8">
             <h2 className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Episodes</h2>
-            <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Follow this show to tick off the episodes you've watched.</p>
+            <div className="mt-3 flex items-center justify-between gap-4 py-1">
+              <span className="text-[15px]">Watched all episodes</span>
+              {busy ? <Spinner /> : <Switch checked={false} onChange={watchAll} label="Watched all episodes" />}
+            </div>
+            <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+              Follow this show to tick off episodes one by one. Turning this on follows it and ticks every aired episode.
+            </p>
           </section>
         )}
 

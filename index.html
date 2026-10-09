@@ -14,6 +14,15 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Shows" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <script>
+      // Apply the saved light/dark choice before anything is drawn (see src/lib/theme.ts).
+      try {
+        var t = localStorage.getItem('theme')
+      } catch (e) {}
+      if (t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark')
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

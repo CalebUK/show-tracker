@@ -94,6 +94,37 @@ export function Chips<T extends string>({
   )
 }
 
+/** An on/off switch, styled like the native ones on iOS and Android. */
+export function Switch({
+  checked,
+  onChange,
+  disabled,
+  label,
+}: {
+  checked: boolean
+  onChange: (value: boolean) => void
+  disabled?: boolean
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+        checked ? 'bg-accent' : 'bg-neutral-200 dark:bg-neutral-700'
+      }`}
+    >
+      <span
+        className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : ''}`}
+      />
+    </button>
+  )
+}
+
 export function Toast() {
   const message = toastStore.use()
   if (!message) return null

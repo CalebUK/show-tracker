@@ -1,16 +1,18 @@
 @import 'tailwindcss';
 
+/* Dark mode follows a `dark` class on <html>, set from Settings → Appearance (default: follow the system). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* The one accent colour. `accent` is for fills, `accent-text` for text and links. */
 :root {
   --accent: #4f46e5;
   --accent-text: #4f46e5;
-  color-scheme: light dark;
+  color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --accent: #6366f1;
-    --accent-text: #a5b4fc;
-  }
+:root.dark {
+  --accent: #6366f1;
+  --accent-text: #a5b4fc;
+  color-scheme: dark;
 }
 
 @theme inline {

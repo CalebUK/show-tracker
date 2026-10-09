@@ -19,6 +19,7 @@ import {
 } from '../lib/tmdb'
 import { Button, ScreenHeader } from '../components/Layout'
 import { CoffeeIcon } from '../components/Icons'
+import { setThemePref, themeStore, type ThemePref } from '../lib/theme'
 import { TmdbKeyForm, TmdbKeyHelp } from '../components/TmdbKeyForm'
 
 const REMIND_AFTER_DAYS = 14
@@ -145,6 +146,7 @@ export function Settings() {
 
         <TmdbKeySection />
         <RegionSection />
+        <AppearanceSection />
         <InstallSection />
         <StorageSection />
 
@@ -271,6 +273,37 @@ function RegionSection() {
           </option>
         ))}
       </select>
+    </Section>
+  )
+}
+
+const THEMES: { id: ThemePref; label: string }[] = [
+  { id: 'system', label: 'System' },
+  { id: 'light', label: 'Light' },
+  { id: 'dark', label: 'Dark' },
+]
+
+function AppearanceSection() {
+  const pref = themeStore.use()
+  return (
+    <Section title="Appearance">
+      <div className="grid grid-cols-3 gap-1 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800" role="radiogroup" aria-label="Theme">
+        {THEMES.map((t) => (
+          <button
+            key={t.id}
+            role="radio"
+            aria-checked={pref === t.id}
+            onClick={() => setThemePref(t.id)}
+            className={`h-9 rounded-lg text-sm font-medium transition ${
+              pref === t.id
+                ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-950 dark:text-neutral-100'
+                : 'text-neutral-500 dark:text-neutral-400'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
     </Section>
   )
 }

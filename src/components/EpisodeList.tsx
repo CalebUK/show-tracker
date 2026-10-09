@@ -3,10 +3,11 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, episodeKey, type Episode, type Show } from '../db'
 import { formatAirTime } from '../lib/dates'
 import { byEpisodeOrder, isAired } from '../lib/progress'
-import { setWatched } from '../lib/watched'
+import { clearWatched, setWatched } from '../lib/watched'
 import { errorMessage, toast } from '../lib/toast'
 import { useNow } from '../hooks/useNow'
 import { CheckIcon, ChevronIcon } from './Icons'
+import { Switch } from './Layout'
 
 /** Seasons and episodes with tick boxes, for a followed show. */
 export function EpisodeList({ show }: { show: Show }) {
@@ -21,6 +22,7 @@ export function EpisodeList({ show }: { show: Show }) {
   const [openSeasons, setOpenSeasons] = useState<Set<number> | null>(null)
   // After ticking an episode, offer to tick the unwatched ones before it too.
   const [earlier, setEarlier] = useState<Episode[] | null>(null)
+  const [beforeAll, setBeforeAll] = useState<Set<string> | null>(null)
 
   if (!data) return null
 
@@ -64,17 +66,34 @@ export function EpisodeList({ show }: { show: Show }) {
     setEarlier(before.length ? before : null)
   }
 
-  const markAll = async () => {
-    const todo = aired.filter((e) => !isWatched(e))
-    if (!todo.length || !window.confirm(`Mark all ${todo.length} aired episodes as watched?`)) return
-    await run(todo, true)
+  const allWatched = aired.length > 0 && watchedCount === aired.length
+  const toggleAll = async (value: boolean) => {
     setEarlier(null)
+    try {
+      if (value) {
+        // Remember what was ticked, so switching straight back off restores it.
+        setBeforeAll(new Set(data.watched))
+        await setWatched(aired.filter((e) => !isWatched(e)), true)
+      } else if (beforeAll) {
+        await clearWatched(show.tmdb_id, beforeAll)
+        setBeforeAll(null)
+      } else if (window.confirm(`Untick all ${watchedCount} watched episodes of ${show.name}?`)) {
+        await clearWatched(show.tmdb_id)
+      }
+    } catch (err) {
+      toast(errorMessage(err))
+    }
   }
 
   return (
     <Section title="Episodes" right={`${watchedCount} of ${aired.length} watched`}>
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
         <div className="h-full rounded-full bg-accent" style={{ width: `${aired.length ? (watchedCount / aired.length) * 100 : 0}%` }} />
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-4 py-1">
+        <span className="text-[15px]">Watched all episodes</span>
+        <Switch checked={allWatched} onChange={toggleAll} disabled={aired.length === 0} label="Watched all episodes" />
       </div>
 
       {earlier && (
@@ -154,11 +173,6 @@ export function EpisodeList({ show }: { show: Show }) {
         })}
       </ul>
 
-      {watchedCount < aired.length && (
-        <button onClick={markAll} className="mt-2 text-sm text-accent-text">
-          Mark all aired episodes as watched
-        </button>
-      )}
     </Section>
   )
 }
