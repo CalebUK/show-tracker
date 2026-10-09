@@ -35,18 +35,13 @@ const at = (days: number, hour = 21) => new Date(2026, 9, 9 + days, hour, 0)
 describe('groupUpcoming', () => {
   const shows = new Map([1, 2, 3].map((id) => [id, show(id)]))
 
-  it('splits into today, this week and later, listing each show once at its next episode', () => {
+  it('splits into today, this week and later', () => {
     const eps = [ep(1, at(0, 9)), ep(1, at(0)), ep(2, at(3)), ep(2, at(6, 23)), ep(3, at(7, 0)), ep(3, at(14))]
     const g = groupUpcoming(eps, shows, now)
-    expect(g.today.map((r) => r.episodes[0].airstamp)).toEqual([at(0, 9).toISOString()])
-    expect(g.week.map((r) => r.episodes[0].airstamp)).toEqual([at(3).toISOString()])
+    expect(g.today.map((r) => r.show.tmdb_id)).toEqual([1, 1])
+    expect(g.week.map((r) => r.show.tmdb_id)).toEqual([2, 2])
+    // Later only shows each show's next episode.
     expect(g.later.map((r) => r.episodes[0].airstamp)).toEqual([at(7, 0).toISOString()])
-  })
-
-  it("doesn't repeat a show airing today under This week", () => {
-    const g = groupUpcoming([ep(1, at(0)), ep(1, at(2)), ep(2, at(2))], shows, now)
-    expect(g.today.map((r) => r.show.tmdb_id)).toEqual([1])
-    expect(g.week.map((r) => r.show.tmdb_id)).toEqual([2])
   })
 
   it('leaves shows already listed this week out of Later', () => {

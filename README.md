@@ -57,7 +57,7 @@ src/
 
 A few choices the spec left open:
 
-- **On air** lists each show once, at its next episode: under Today, This week or Later. A fully scheduled season, or a show airing today and again later in the week, never shows up twice.
+- **On air** lists every episode airing today and this week, so a show with more than one episode can appear more than once. **Later** shows only each show's *next* episode (and not at all if it's already listed this week), so a fully scheduled season doesn't flood the list.
 - Episodes of one show that drop at the same moment (a Netflix-style season release) collapse into one row: "S2 E1–8 · 8 episodes".
 - Every episode of a followed show is stored (past and future), so past episodes can be ticked as watched. Ticks are kept in their own table keyed by show/season/episode, survive refreshes and unfollowing, and are included in backups (current backup format is v3; older files still import).
 - **Rankings use Elo.** Pick Liked it / It was fine / Didn't like it (which sets a starting rating in the middle of that bucket), then answer up to 6 "Which was better?" questions against your closest-rated ranked shows. Each answer moves both shows' ratings; "Too close to call" is a draw. A rating of 1500 is a 5.0 and every 100 points is one point of score, kept inside the bucket's range (Liked 6.8–10, Fine 3.4–6.7, Didn't like 0–3.3). "Compare more" fine-tunes a ranked show; picking a bucket again starts it over. Shows you've ticked episodes of but not ranked appear under "Ready to rank".
