@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { BackIcon, CalendarIcon, RankIcon, SearchIcon, SettingsIcon, TvIcon } from './Icons'
 import { goBack, navigate, type Tab } from '../lib/router'
 import { toastStore } from '../lib/toast'
+import { isIOS, isStandalone } from '../lib/install'
 
 /** Sticky title bar for a tab screen. */
 export function ScreenHeader({ title, right, children }: { title: string; right?: ReactNode; children?: ReactNode }) {
@@ -90,6 +91,21 @@ export function Chips<T extends string>({
           {o.count ? <span className="ml-1 opacity-60">{o.count}</span> : null}
         </button>
       ))}
+    </div>
+  )
+}
+
+/**
+ * iPhone only, in a browser tab: Home Screen web apps get their own storage, separate from
+ * Safari, so anything added here won't show up in the installed app.
+ */
+export function IosInstallNote({ className = '' }: { className?: string }) {
+  if (!isIOS() || isStandalone()) return null
+  return (
+    <div className={`rounded-xl bg-neutral-50 p-3 text-sm leading-relaxed text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300 ${className}`}>
+      <span className="font-medium text-neutral-900 dark:text-neutral-100">Add to Home Screen first.</span> Tap Share, then Add
+      to Home Screen, and use the app from there. On iPhone, shows added in the browser won't carry over to the Home Screen
+      app.
     </div>
   )
 }

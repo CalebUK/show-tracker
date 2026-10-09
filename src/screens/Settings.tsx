@@ -326,7 +326,7 @@ function InstallSection() {
       ) : (
         <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
           {isIOS()
-            ? 'In Safari, tap Share, then Add to Home Screen.'
+            ? 'In Safari, tap Share, then Add to Home Screen. Use the app from there: on iPhone, the Home Screen app keeps its own data, separate from Safari.'
             : 'In Chrome, open the menu and choose Install app (or Add to Home screen).'}
         </p>
       )}

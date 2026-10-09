@@ -6,7 +6,7 @@ import { follow } from '../lib/shows'
 import { navigate } from '../lib/router'
 import { errorMessage, toast } from '../lib/toast'
 import { useOnline } from '../hooks/useOnline'
-import { ScreenHeader } from '../components/Layout'
+import { IosInstallNote, ScreenHeader } from '../components/Layout'
 import { TmdbKeyForm, TmdbKeyHelp } from '../components/TmdbKeyForm'
 import { Poster } from '../components/Poster'
 import { CheckIcon, CloseIcon, PlusIcon, SearchIcon, Spinner } from '../components/Icons'
@@ -86,6 +86,8 @@ export function Search() {
           </label>
         </div>
       </ScreenHeader>
+
+      <IosInstallNote className="mx-5 mt-2" />
 
       {!tmdbKey ? (
         <div className="px-5 pt-6">
