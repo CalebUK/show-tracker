@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Bucket } from '../db'
-import { eloUpdate, expectedScore, pickOpponent, ratingToScore, scoreToRating, startingRating } from './elo'
+import { eloUpdate, expectedScore, kFor, pickOpponent, questionCount, ratingToScore, rawScore, scoreToRating, startingRating, suggestedBucket } from './elo'
 
 describe('scores and ratings', () => {
   it('maps 1500 to 5.0 and 100 points to one point of score', () => {
@@ -85,5 +85,41 @@ describe('a full ranking', () => {
     expect(worst).toBeLessThan(7.3)
     expect(middle).toBeGreaterThan(worst)
     expect(middle).toBeLessThan(best)
+  })
+})
+
+describe('question settings', () => {
+  it('asks the chosen number of questions, capped by how many shows are ranked', () => {
+    expect(questionCount(6, 40)).toBe(6)
+    expect(questionCount(15, 40)).toBe(15)
+    expect(questionCount(15, 4)).toBe(4)
+    expect(questionCount('all', 40)).toBe(40)
+    expect(questionCount('all', 0)).toBe(0)
+  })
+
+  it('takes big steps for the first 6 answers, then smaller ones', () => {
+    expect(kFor(0, false)).toBe(64)
+    expect(kFor(5, false)).toBe(64)
+    expect(kFor(6, false)).toBe(32)
+    expect(kFor(0, true)).toBe(32)
+  })
+})
+
+describe('suggestedBucket', () => {
+  it('suggests nothing while the rating is inside its bucket', () => {
+    expect(suggestedBucket('fine', scoreToRating(5))).toBeNull()
+    expect(suggestedBucket('liked', scoreToRating(6.8))).toBeNull()
+  })
+
+  it('suggests the bucket the rating has moved into, up or down', () => {
+    expect(suggestedBucket('fine', scoreToRating(7.2))).toBe('liked')
+    expect(suggestedBucket('liked', scoreToRating(6.3))).toBe('fine')
+    expect(suggestedBucket('fine', scoreToRating(2.9))).toBe('disliked')
+    expect(suggestedBucket('disliked', scoreToRating(7.5))).toBe('liked')
+  })
+
+  it('rounds like the displayed score, so 6.75 counts as Liked', () => {
+    expect(suggestedBucket('fine', scoreToRating(6.75))).toBe('liked')
+    expect(rawScore(scoreToRating(6.74))).toBe(6.7)
   })
 })

@@ -18,8 +18,10 @@ import {
   useTmdbKey,
 } from '../lib/tmdb'
 import { Button, ScreenHeader } from '../components/Layout'
-import { CoffeeIcon } from '../components/Icons'
+import { ChevronIcon, CoffeeIcon } from '../components/Icons'
 import { setThemePref, themeStore, type ThemePref } from '../lib/theme'
+import { questionsStore, setQuestionSetting } from '../lib/ranking'
+import { QUESTION_OPTIONS } from '../lib/elo'
 import { TmdbKeyForm, TmdbKeyHelp } from '../components/TmdbKeyForm'
 
 const REMIND_AFTER_DAYS = 14
@@ -146,6 +148,7 @@ export function Settings() {
 
         <TmdbKeySection />
         <RegionSection />
+        <RankingSection />
         <AppearanceSection />
         <InstallSection />
         <StorageSection />
@@ -277,6 +280,95 @@ function RegionSection() {
   )
 }
 
+function RankingSection() {
+  const setting = questionsStore.use()
+  const ranked = useLiveQuery(() => db.rankings.count()) ?? 0
+  return (
+    <Section title="Ranking">
+      <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        Questions per ranking. More questions give a more precise score; All compares a new show against every show you've
+        ranked{ranked > 0 ? ` (${ranked} right now)` : ''}.
+      </p>
+      <Segmented
+        label="Questions per ranking"
+        options={QUESTION_OPTIONS.map((q) => ({ id: q, label: q === 'all' ? 'All' : String(q) }))}
+        value={setting}
+        onChange={setQuestionSetting}
+        className="mt-3"
+      />
+      <details className="group mt-4 rounded-xl bg-neutral-50 px-4 py-3 dark:bg-neutral-900">
+        <summary className="flex cursor-pointer list-none items-center justify-between text-[15px] font-medium [&::-webkit-details-marker]:hidden">
+          How rankings work
+          <ChevronIcon width={18} height={18} className="text-neutral-400 transition group-open:rotate-90" />
+        </summary>
+        <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">
+          <li>
+            <span className="font-medium text-neutral-900 dark:text-neutral-100">Pick how you felt.</span> Liked it (6.8–10), It was
+            fine (3.4–6.7) or Didn't like it (0–3.3). The show starts in the middle of that range.
+          </li>
+          <li>
+            <span className="font-medium text-neutral-900 dark:text-neutral-100">Answer “Which was better?”</span> Each question
+            uses the ranked show closest to its current score, so every answer counts. Too close to call is a draw.
+          </li>
+          <li>
+            <span className="font-medium text-neutral-900 dark:text-neutral-100">Scores shift with every answer.</span> It's an Elo
+            rating, like in chess: the new show moves in big steps for its first 6 answers, then smaller ones, and the show it was
+            compared with moves a little too.
+          </li>
+          <li>
+            <span className="font-medium text-neutral-900 dark:text-neutral-100">Scores stay in their bucket.</span> If your answers
+            push a show past its range, you're asked whether to move it (for example from Fine up to Liked).
+          </li>
+          <li>
+            <span className="font-medium text-neutral-900 dark:text-neutral-100">Fine-tune any time.</span> Rank an already ranked
+            show and tap Compare more to answer a few more questions, or pick a bucket to start it over.
+          </li>
+        </ol>
+      </details>
+    </Section>
+  )
+}
+
+/** A row of mutually exclusive options, like the native segmented controls. */
+function Segmented<T extends string | number>({
+  label,
+  options,
+  value,
+  onChange,
+  className = '',
+}: {
+  label: string
+  options: { id: T; label: string }[]
+  value: T
+  onChange: (id: T) => void
+  className?: string
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={`grid gap-1 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800 ${className}`}
+      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+    >
+      {options.map((o) => (
+        <button
+          key={o.id}
+          role="radio"
+          aria-checked={value === o.id}
+          onClick={() => onChange(o.id)}
+          className={`h-9 rounded-lg text-sm font-medium transition ${
+            value === o.id
+              ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-950 dark:text-neutral-100'
+              : 'text-neutral-500 dark:text-neutral-400'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 const THEMES: { id: ThemePref; label: string }[] = [
   { id: 'system', label: 'System' },
   { id: 'light', label: 'Light' },
@@ -287,23 +379,7 @@ function AppearanceSection() {
   const pref = themeStore.use()
   return (
     <Section title="Appearance">
-      <div className="grid grid-cols-3 gap-1 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800" role="radiogroup" aria-label="Theme">
-        {THEMES.map((t) => (
-          <button
-            key={t.id}
-            role="radio"
-            aria-checked={pref === t.id}
-            onClick={() => setThemePref(t.id)}
-            className={`h-9 rounded-lg text-sm font-medium transition ${
-              pref === t.id
-                ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-950 dark:text-neutral-100'
-                : 'text-neutral-500 dark:text-neutral-400'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Segmented label="Theme" options={THEMES} value={pref} onChange={setThemePref} />
     </Section>
   )
 }

@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Bucket, type Show } from '../db'
 import { loadShow } from '../lib/shows'
-import { BUCKETS, rankedPool, saveRanking, sortRankings, type Opponent } from '../lib/ranking'
-import { COMPARISONS, K_NEW, K_OPPONENT, K_REFINE, eloUpdate, pickOpponent, ratingToScore, startingRating } from '../lib/elo'
+import { BUCKETS, questionsStore, rankedPool, saveRanking, sortRankings, type Opponent } from '../lib/ranking'
+import { K_OPPONENT, RANGES, eloUpdate, kFor, pickOpponent, questionCount, ratingToScore, rawScore, startingRating, suggestedBucket } from '../lib/elo'
 import { goBack, navigate } from '../lib/router'
 import { errorMessage } from '../lib/toast'
 import { Button, Overlay } from '../components/Layout'
@@ -14,7 +14,8 @@ import { Spinner } from '../components/Icons'
 interface Session {
   bucket: Bucket
   rating: number
-  k: number
+  /** Fine-tuning an existing ranking ("Compare more"): smaller steps from the first answer. */
+  refining: boolean
   pool: Opponent[]
   /** Shows already compared, in order. */
   used: number[]
@@ -27,6 +28,7 @@ interface Session {
 type Step =
   | { kind: 'bucket' }
   | { kind: 'compare'; session: Session }
+  | { kind: 'move'; session: Session; suggested: Bucket }
   | { kind: 'saving' }
   | { kind: 'done'; bucket: Bucket; score: number; rank: number; count: number }
 
@@ -41,17 +43,24 @@ export function RankFlow({ id }: { id: number }) {
     loadShow(id).then(setShow, (err) => setError(errorMessage(err)))
   }, [id])
 
-  const finish = async (s: Session) => {
+  /** Questions are over. If the answers pushed the show out of its bucket, ask first; otherwise save. */
+  const finish = (s: Session) => {
+    const suggested = suggestedBucket(s.bucket, s.rating)
+    if (suggested) setStep({ kind: 'move', session: s, suggested })
+    else save(s, s.bucket)
+  }
+
+  const save = async (s: Session, bucket: Bucket) => {
     if (!show) return
     setStep({ kind: 'saving' })
     try {
       const opponents = new Map(s.pool.filter((o) => s.used.includes(o.id)).map((o) => [o.id, o.rating]))
-      await saveRanking(show, { bucket: s.bucket, rating: s.rating, comparisons: s.previousComparisons + s.used.length, opponents })
+      await saveRanking(show, { bucket, rating: s.rating, comparisons: s.previousComparisons + s.used.length, opponents })
       const all = (await db.rankings.toArray()).sort(sortRankings)
       setStep({
         kind: 'done',
-        bucket: s.bucket,
-        score: ratingToScore(s.bucket, s.rating),
+        bucket,
+        score: ratingToScore(bucket, s.rating),
         rank: all.findIndex((r) => r.tmdb_show_id === id) + 1,
         count: all.length,
       })
@@ -66,10 +75,10 @@ export function RankFlow({ id }: { id: number }) {
     const session: Session = {
       bucket,
       rating: refine && current ? current.rating : startingRating(bucket),
-      k: refine ? K_REFINE : K_NEW,
+      refining: refine,
       pool,
       used: [],
-      total: Math.min(COMPARISONS, pool.length),
+      total: questionCount(questionsStore.get(), pool.length),
       previousComparisons: refine && current ? current.comparisons : 0,
       history: [],
     }
@@ -135,7 +144,7 @@ export function RankFlow({ id }: { id: number }) {
     const s = step.session
     const opponent = pickOpponent(s.rating, s.bucket, s.pool, new Set(s.used))!
     const answer = (result: number) => {
-      const [rating, opponentRating] = eloUpdate(s.rating, opponent.rating, result, s.k, K_OPPONENT)
+      const [rating, opponentRating] = eloUpdate(s.rating, opponent.rating, result, kFor(s.used.length, s.refining), K_OPPONENT)
       const next: Session = {
         ...s,
         rating,
@@ -169,6 +178,39 @@ export function RankFlow({ id }: { id: number }) {
             </Button>
             <Button variant="ghost" onClick={undo}>
               Undo
+            </Button>
+            {s.used.length > 0 && (
+              <button onClick={() => finish(s)} className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+                Stop here and save
+              </button>
+            )}
+          </div>
+        </div>
+      </Overlay>
+    )
+  }
+
+  if (step.kind === 'move') {
+    const s = step.session
+    const from = BUCKETS.find((b) => b.id === s.bucket)!
+    const to = BUCKETS.find((b) => b.id === step.suggested)!
+    const [top, bottom] = RANGES[s.bucket]
+    const raw = Math.min(10, Math.max(0, rawScore(s.rating)))
+    return (
+      <Overlay>
+        <div className="flex flex-col items-center px-6 pt-8 pb-10 text-center">
+          <Poster path={show.poster_path} name={show.name} size="lg" />
+          <h1 className="mt-6 text-xl font-semibold tracking-tight">Move to {to.short}?</h1>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+            Your answers put {show.name} at <span className="font-medium text-neutral-900 dark:text-neutral-100">{raw.toFixed(1)}</span>,{' '}
+            {raw > top ? 'above' : 'below'} the “{from.label}” range ({bottom.toFixed(1)}–{top.toFixed(1)}).
+          </p>
+          <div className="mt-8 flex w-full max-w-xs flex-col gap-3">
+            <Button onClick={() => save(s, step.suggested)} className="h-14 text-base">
+              Move to {to.short} · {ratingToScore(step.suggested, s.rating).toFixed(1)}
+            </Button>
+            <Button variant="secondary" onClick={() => save(s, s.bucket)} className="h-14 text-base">
+              Keep in {from.short} · {ratingToScore(s.bucket, s.rating).toFixed(1)}
             </Button>
           </div>
         </div>

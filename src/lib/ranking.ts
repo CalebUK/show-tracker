@@ -1,5 +1,19 @@
-import { db, isOwned, type Bucket, type Ranking, type Show } from '../db'
-import { ratingToScore } from './elo'
+import { db, getMeta, isOwned, setMeta, type Bucket, type Ranking, type Show } from '../db'
+import { DEFAULT_QUESTIONS, QUESTION_OPTIONS, ratingToScore, type QuestionSetting } from './elo'
+import { createStore } from './store'
+
+/** Questions per ranking (Settings → Ranking). Stored per phone; not part of backups. */
+export const questionsStore = createStore<QuestionSetting>(DEFAULT_QUESTIONS)
+
+export async function loadQuestionSetting() {
+  const saved = await getMeta<QuestionSetting>('rankingQuestions')
+  if (saved && QUESTION_OPTIONS.includes(saved)) questionsStore.set(saved)
+}
+
+export async function setQuestionSetting(value: QuestionSetting) {
+  await setMeta('rankingQuestions', value)
+  questionsStore.set(value)
+}
 
 export const BUCKETS: { id: Bucket; label: string; short: string }[] = [
   { id: 'liked', label: 'Liked it', short: 'Liked' },

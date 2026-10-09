@@ -4,6 +4,7 @@ import { registerSW } from 'virtual:pwa-register'
 import { requestPersistentStorage } from './lib/install'
 import { loadRegion, loadTmdbKey } from './lib/tmdb'
 import { applyTheme } from './lib/theme'
+import { loadQuestionSetting } from './lib/ranking'
 import { App } from './App'
 import './index.css'
 
@@ -12,7 +13,7 @@ requestPersistentStorage()
 applyTheme()
 
 // Load per-phone settings first so Search doesn't flash the "add a key" prompt.
-Promise.all([loadTmdbKey(), loadRegion()])
+Promise.all([loadTmdbKey(), loadRegion(), loadQuestionSetting()])
   .catch(() => {})
   .finally(() =>
     createRoot(document.getElementById('root')!).render(

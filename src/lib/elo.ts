@@ -16,16 +16,44 @@ export function ratingToScore(bucket: Bucket, rating: number) {
   return Math.round(score * 10) / 10
 }
 
+/** The score a rating would have with no bucket limits, rounded like displayed scores. */
+export const rawScore = (rating: number) => Math.round((5 + (rating - 1500) / 100) * 10) / 10
+
+/** Which bucket's range a score falls in (above 10 counts as Liked, below 0 as Didn't like). */
+export function bucketForScore(score: number): Bucket {
+  if (score >= RANGES.liked[1]) return 'liked'
+  if (score >= RANGES.fine[1]) return 'fine'
+  return 'disliked'
+}
+
+/** If your answers pushed a show's rating past its bucket's range, the bucket it now belongs in. */
+export function suggestedBucket(bucket: Bucket, rating: number): Bucket | null {
+  const fits = bucketForScore(rawScore(rating))
+  return fits === bucket ? null : fits
+}
+
 /** A newly ranked show starts in the middle of its bucket (Liked 8.4, Fine 5.1, Didn't like 1.7). */
 export const startingRating = (bucket: Bucket) => scoreToRating((RANGES[bucket][0] + RANGES[bucket][1]) / 2)
 
-/** How many "Which was better?" questions one ranking asks (fewer if you haven't ranked that many shows). */
-export const COMPARISONS = 6
+/** Questions per ranking, chosen in Settings. 'all' compares against every ranked show. */
+export type QuestionSetting = 6 | 10 | 15 | 'all'
+export const QUESTION_OPTIONS: QuestionSetting[] = [6, 10, 15, 'all']
+export const DEFAULT_QUESTIONS: QuestionSetting = 6
+
+/** How many questions a ranking will ask: the setting, capped at how many other shows are ranked. */
+export const questionCount = (setting: QuestionSetting, poolSize: number) =>
+  setting === 'all' ? poolSize : Math.min(setting, poolSize)
 
 /** How far one answer can move a rating. A new show moves a lot, the show it's compared with only a little. */
 export const K_NEW = 64
 export const K_REFINE = 32
 export const K_OPPONENT = 16
+
+/**
+ * A new show's first 6 answers move it in big steps to find roughly where it belongs; after that
+ * (and when fine-tuning with "Compare more") the steps are smaller, so long sessions settle down.
+ */
+export const kFor = (questionIndex: number, refining: boolean) => (refining || questionIndex >= 6 ? K_REFINE : K_NEW)
 
 /** Chance that a show rated `a` is preferred over one rated `b`. */
 export const expectedScore = (a: number, b: number) => 1 / (1 + 10 ** ((b - a) / 400))
