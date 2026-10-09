@@ -88,6 +88,8 @@ export function parseBackup(text: string): BackupFile {
       followed: s.followed === true,
       followed_at: strOrNull(s.followed_at),
       last_refreshed_at: strOrNull(s.last_refreshed_at),
+      own_dvd: s.own_dvd === true,
+      own_streaming: s.own_streaming === true,
     }
   })
   const showIds = new Set(shows.map((s) => s.tmdb_id))

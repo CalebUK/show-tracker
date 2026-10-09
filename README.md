@@ -6,11 +6,16 @@ A minimalist personal TV tracker, installable as a PWA: **what's coming up** for
 
 ```bash
 npm install
-cp .env.example .env   # then paste your TMDB key into VITE_TMDB_KEY
 npm run dev
 ```
 
-Get a free key at themoviedb.org → Settings → API. Either the v3 "API Key" or the v4 "Read Access Token" works. The key ends up in the built app, so make one just for this.
+### TMDB key
+
+Each phone stores its own TMDB key. The app asks for one on the Search screen (and in Settings). It's checked with TMDB before saving, kept only in that phone's IndexedDB, and left out of backups. The deployed site never contains a key, so the repo and hosting can be public.
+
+Get a free key at themoviedb.org → Settings → API. Either the v3 "API Key" or the v4 "API Read Access Token" works. Two people can each use their own, or paste the same one into both phones.
+
+For local development you can skip pasting by copying `.env.example` to `.env` and setting `VITE_TMDB_KEY`. Only `npm run dev` reads it; production builds ignore it.
 
 | Command | What it does |
 |---|---|
@@ -24,7 +29,7 @@ Get a free key at themoviedb.org → Settings → API. Either the v3 "API Key" o
 
 `dist/` is plain static files. Installing to the home screen needs HTTPS, so test installs from a deployed copy:
 
-- **Netlify / Vercel:** build command `npm run build`, output `dist`, and add `VITE_TMDB_KEY` as an environment variable.
+- **Netlify / Vercel:** build command `npm run build`, output `dist`. No environment variables needed.
 - **GitHub Pages (project site):** build with `npm run build -- --base=/<repo-name>/`.
 
 Routing is hash-based (`#/rankings`), so no rewrite rules are needed anywhere.
@@ -56,5 +61,7 @@ A few choices the spec left open:
 - Only episodes from the last two days onward are stored. Nothing displays older ones, and it keeps backups small.
 - "Too close to call" places the show directly below the one it was compared with.
 - Re-ranking keeps the old position until the new one is confirmed, so backing out changes nothing.
-- Unfollowing a show that isn't ranked deletes it from the device; a ranked show keeps its record.
-- The streaming region comes from the phone's language setting (e.g. `en-GB` → GB), falling back to US.
+- **Own on DVD / Own on streaming** ticks live on each show page and are included in backups. Ticking a show you don't follow saves it.
+- A show is kept on the device while it's followed, ranked or owned; once none of those apply, it's deleted.
+- **Where to stream** is per country. Each phone guesses its region from the language setting (`en-GB` → United Kingdom) and can override it in Settings → Streaming region. Subscription services are listed first, then free ones (BBC iPlayer, ITVX…), then ad-supported; rent/buy is left out. Store variants like "Netflix Standard with Ads" are folded into the main service, and only the first six show until you tap "Show more".
+- The **Shows** tab lists everything you follow A–Z with its next episode or status, including ended shows that never appear on Upcoming.

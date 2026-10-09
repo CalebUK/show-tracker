@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
-import { hasTmdbKey, searchShows, type SearchResult } from '../lib/tmdb'
+import { searchShows, useTmdbKey, type SearchResult } from '../lib/tmdb'
 import { follow } from '../lib/shows'
 import { navigate } from '../lib/router'
 import { errorMessage, toast } from '../lib/toast'
 import { useOnline } from '../hooks/useOnline'
 import { ScreenHeader } from '../components/Layout'
+import { TmdbKeyForm, TmdbKeyHelp } from '../components/TmdbKeyForm'
 import { Poster } from '../components/Poster'
 import { CheckIcon, CloseIcon, PlusIcon, SearchIcon, Spinner } from '../components/Icons'
 
@@ -16,6 +17,7 @@ let lastResults: SearchResult[] | null = null
 
 export function Search() {
   const online = useOnline()
+  const tmdbKey = useTmdbKey()
   const [query, setQuery] = useState(lastQuery)
   const [results, setResults] = useState<SearchResult[] | null>(lastResults)
   const [loading, setLoading] = useState(false)
@@ -33,7 +35,7 @@ export function Search() {
   useEffect(() => {
     lastQuery = query
     const q = query.trim()
-    if (q.length < 2 || !hasTmdbKey) {
+    if (q.length < 2 || !tmdbKey) {
       setLoading(false)
       if (!q) setResults((lastResults = null))
       return
@@ -53,7 +55,7 @@ export function Search() {
       }
     }, 350)
     return () => clearTimeout(timer)
-  }, [query])
+  }, [query, tmdbKey])
 
   return (
     <>
@@ -85,11 +87,12 @@ export function Search() {
         </div>
       </ScreenHeader>
 
-      {!hasTmdbKey ? (
-        <Notice>
-          Search needs a TMDB API key. Copy <code>.env.example</code> to <code>.env</code>, add your key as{' '}
-          <code>VITE_TMDB_KEY</code>, then restart the dev server or rebuild.
-        </Notice>
+      {!tmdbKey ? (
+        <div className="px-5 pt-6">
+          <h2 className="mb-2 text-[15px] font-medium">Add your TMDB key to search</h2>
+          <TmdbKeyHelp />
+          <TmdbKeyForm />
+        </div>
       ) : !online ? (
         <Notice>Search needs a connection.</Notice>
       ) : error ? (
@@ -104,7 +107,7 @@ export function Search() {
         </ul>
       )}
 
-      {!results && hasTmdbKey && (
+      {!results && tmdbKey && (
         <p className="px-5 pt-6 text-xs text-neutral-400">Show data from TMDB · Schedules from TVmaze</p>
       )}
     </>

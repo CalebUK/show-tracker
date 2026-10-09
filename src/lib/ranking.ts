@@ -1,4 +1,4 @@
-import { db, type Bucket, type Ranking, type Show } from '../db'
+import { db, isOwned, type Bucket, type Ranking, type Show } from '../db'
 
 export const BUCKETS: { id: Bucket; label: string; short: string }[] = [
   { id: 'liked', label: 'Liked it', short: 'Liked' },
@@ -111,8 +111,8 @@ export async function removeRanking(tmdbId: number) {
     await db.rankings.delete(tmdbId)
     const { ids, rankedAt } = await orderedIds(previous.bucket)
     await writeBucket(previous.bucket, ids, rankedAt)
-    // Clean up shows that are neither followed nor ranked.
+    // Clean up shows that are no longer followed, ranked or owned.
     const show = await db.shows.get(tmdbId)
-    if (show && !show.followed) await db.shows.delete(tmdbId)
+    if (show && !show.followed && !isOwned(show)) await db.shows.delete(tmdbId)
   })
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
  * Hash routing keeps the app working on any static host with no rewrite rules,
  * and lets Android's back button move between screens.
  */
-export type Tab = 'upcoming' | 'rankings' | 'search' | 'settings'
+export type Tab = 'upcoming' | 'shows' | 'rankings' | 'search' | 'settings'
 
 export type Route =
   | { name: Tab }
@@ -15,6 +15,7 @@ export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/')
   const id = Number(parts[1])
   switch (parts[0]) {
+    case 'shows':
     case 'rankings':
     case 'search':
     case 'settings':

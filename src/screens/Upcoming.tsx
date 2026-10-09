@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Show } from '../db'
 import { episodeLabel, formatAirTime, groupUpcoming, startOfDay, type UpcomingGroups, type UpcomingRow } from '../lib/dates'
 import { refreshFollowed, refreshStore } from '../lib/shows'
-import { isOngoing } from '../lib/tmdb'
+import { getTmdbKey, isOngoing } from '../lib/tmdb'
 import { navigate } from '../lib/router'
 import { toast } from '../lib/toast'
 import { useNow } from '../hooks/useNow'
@@ -45,6 +45,10 @@ export function Upcoming() {
   const forceRefresh = useCallback(async () => {
     if (!navigator.onLine) {
       toast("You're offline. Showing saved episodes.")
+      return
+    }
+    if (!getTmdbKey()) {
+      toast('Add your TMDB key in Settings to refresh.')
       return
     }
     await refreshFollowed({ force: true })

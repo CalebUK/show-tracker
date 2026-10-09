@@ -5,7 +5,7 @@ const valid = {
   app: 'show-tracker',
   version: 1,
   exported_at: '2026-10-09T10:00:00.000Z',
-  shows: [{ tmdb_id: 1, name: 'A', followed: true }, { tmdb_id: 2, name: 'B' }],
+  shows: [{ tmdb_id: 1, name: 'A', followed: true, own_dvd: true }, { tmdb_id: 2, name: 'B' }],
   episodes: [{ id: 10, tmdb_show_id: 1, season: 1, number: 2, name: 'x', airstamp: '2026-10-10T01:00:00+00:00' }],
   rankings: [{ tmdb_show_id: 2, bucket: 'liked', position: 0, score: 10, ranked_at: '2026-10-01T00:00:00.000Z' }],
 }
@@ -13,7 +13,8 @@ const valid = {
 describe('parseBackup', () => {
   it('accepts a valid backup and fills in defaults', () => {
     const b = parseBackup(JSON.stringify(valid))
-    expect(b.shows[1]).toMatchObject({ tmdb_id: 2, followed: false, streaming: [], tvmaze_id: null })
+    expect(b.shows[0]).toMatchObject({ own_dvd: true, own_streaming: false })
+    expect(b.shows[1]).toMatchObject({ tmdb_id: 2, followed: false, streaming: [], tvmaze_id: null, own_dvd: false })
     expect(b.episodes[0].airstamp).toBe('2026-10-10T01:00:00.000Z')
   })
 

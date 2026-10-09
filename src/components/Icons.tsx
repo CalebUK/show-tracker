@@ -26,6 +26,13 @@ export const CalendarIcon = (p: P) => (
   </Base>
 )
 
+export const TvIcon = (p: P) => (
+  <Base {...p}>
+    <rect x="3" y="7" width="18" height="13" rx="2.5" />
+    <path d="M8.5 3l3.5 3.5L15.5 3" />
+  </Base>
+)
+
 export const RankIcon = (p: P) => (
   <Base {...p}>
     <path d="M9 6h11M9 12h11M9 18h11" />

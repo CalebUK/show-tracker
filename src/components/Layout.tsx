@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { BackIcon, CalendarIcon, RankIcon, SearchIcon, SettingsIcon } from './Icons'
+import { BackIcon, CalendarIcon, RankIcon, SearchIcon, SettingsIcon, TvIcon } from './Icons'
 import { goBack, navigate, type Tab } from '../lib/router'
 import { toastStore } from '../lib/toast'
 
@@ -18,6 +18,7 @@ export function ScreenHeader({ title, right, children }: { title: string; right?
 
 const TABS: { id: Tab; label: string; path: string; Icon: typeof CalendarIcon }[] = [
   { id: 'upcoming', label: 'Upcoming', path: '/', Icon: CalendarIcon },
+  { id: 'shows', label: 'Shows', path: '/shows', Icon: TvIcon },
   { id: 'rankings', label: 'Rankings', path: '/rankings', Icon: RankIcon },
   { id: 'search', label: 'Search', path: '/search', Icon: SearchIcon },
   { id: 'settings', label: 'Settings', path: '/settings', Icon: SettingsIcon },
@@ -89,12 +90,14 @@ export function Button({
   children,
   onClick,
   variant = 'primary',
+  type = 'button',
   disabled,
   className = '',
 }: {
   children: ReactNode
   onClick?: () => void
   variant?: 'primary' | 'secondary' | 'ghost'
+  type?: 'button' | 'submit'
   disabled?: boolean
   className?: string
 }) {
@@ -105,6 +108,7 @@ export function Button({
   }[variant]
   return (
     <button
+      type={type}
       onClick={onClick}
       disabled={disabled}
       className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-[15px] font-medium transition disabled:opacity-50 ${styles} ${className}`}

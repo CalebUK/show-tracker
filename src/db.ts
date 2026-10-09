@@ -21,7 +21,12 @@ export interface Show {
   followed: boolean
   followed_at: string | null
   last_refreshed_at: string | null
+  /** Ticked by the user on the show page. Optional so records saved before these existed still load. */
+  own_dvd?: boolean
+  own_streaming?: boolean
 }
+
+export const isOwned = (s: Show) => s.own_dvd === true || s.own_streaming === true
 
 export interface Episode {
   /** TVmaze episode id */

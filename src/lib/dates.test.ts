@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Episode, Show } from '../db'
-import { episodeLabel, groupUpcoming } from './dates'
+import { episodeLabel, formatShortDate, groupUpcoming } from './dates'
 
 const show = (id: number): Show => ({
   tmdb_id: id,
@@ -60,5 +60,16 @@ describe('groupUpcoming', () => {
   it('ignores episodes from earlier days and unfollowed shows', () => {
     const g = groupUpcoming([ep(1, at(-1)), ep(99, at(1))], shows, now)
     expect(g.today.length + g.week.length + g.later.length).toBe(0)
+  })
+})
+
+describe('formatShortDate', () => {
+  it('words dates relative to today', () => {
+    expect(formatShortDate({ airstamp: at(0).toISOString(), has_time: false }, now)).toBe('Today')
+    expect(formatShortDate({ airstamp: at(0).toISOString(), has_time: true }, now)).toMatch(/^Today /)
+    expect(formatShortDate({ airstamp: at(1, 1).toISOString(), has_time: true }, now)).toBe('Tomorrow')
+    expect(formatShortDate({ airstamp: at(3).toISOString(), has_time: true }, now)).toBe(
+      new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(at(3)),
+    )
   })
 })

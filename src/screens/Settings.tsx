@@ -6,7 +6,19 @@ import { installPrompt, isIOS, isStandalone } from '../lib/install'
 import { timeAgo } from '../lib/dates'
 import { refreshFollowed } from '../lib/shows'
 import { errorMessage, toast } from '../lib/toast'
+import {
+  DEV_KEY,
+  detectedRegion,
+  getStreamingRegions,
+  regionName,
+  regionStore,
+  removeTmdbKey,
+  setRegion,
+  tmdbKeyStore,
+  useTmdbKey,
+} from '../lib/tmdb'
 import { Button, ScreenHeader } from '../components/Layout'
+import { TmdbKeyForm, TmdbKeyHelp } from '../components/TmdbKeyForm'
 
 const REMIND_AFTER_DAYS = 14
 
@@ -130,6 +142,8 @@ export function Settings() {
           )}
         </Section>
 
+        <TmdbKeySection />
+        <RegionSection />
         <InstallSection />
         <StorageSection />
 
@@ -159,6 +173,92 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <h2 className="mb-2 text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">{title}</h2>
       {children}
     </section>
+  )
+}
+
+function TmdbKeySection() {
+  const stored = tmdbKeyStore.use()
+  const [editing, setEditing] = useState(false)
+
+  const remove = async () => {
+    if (!window.confirm('Remove the TMDB key from this phone? Search and refresh will stop until you add one again.')) return
+    await removeTmdbKey()
+    toast('TMDB key removed')
+  }
+
+  return (
+    <Section title="TMDB key">
+      {stored && !editing ? (
+        <>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            Saved on this phone, ending in <span className="font-mono text-neutral-700 dark:text-neutral-300">{stored.slice(-4)}</span>.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <Button variant="secondary" onClick={() => setEditing(true)}>
+              Change
+            </Button>
+            <Button variant="secondary" onClick={remove}>
+              Remove
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <TmdbKeyHelp />
+          {!stored && DEV_KEY && (
+            <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+              Using the key from <code className="text-[13px]">.env</code> for now (development builds only).
+            </p>
+          )}
+          <TmdbKeyForm onSaved={() => setEditing(false)} onCancel={editing ? () => setEditing(false) : undefined} />
+        </>
+      )}
+    </Section>
+  )
+}
+
+// Shown if TMDB's full region list can't be loaded (no key yet, or offline).
+const FALLBACK_REGIONS = ['US', 'GB', 'CA', 'AU', 'IE', 'NZ']
+
+function RegionSection() {
+  const stored = regionStore.use()
+  const tmdbKey = useTmdbKey()
+  const [regions, setRegions] = useState<{ code: string; name: string }[] | null>(null)
+  const detected = detectedRegion()
+
+  useEffect(() => {
+    if (!tmdbKey) return
+    getStreamingRegions().then(setRegions, () => setRegions(null))
+  }, [tmdbKey])
+
+  const options = regions ?? FALLBACK_REGIONS.map((code) => ({ code, name: regionName(code) }))
+  if (stored && !options.some((o) => o.code === stored)) options.unshift({ code: stored, name: regionName(stored) })
+
+  const change = async (code: string) => {
+    await setRegion(code)
+    toast(`Streaming region: ${regionName(code || detected)}`)
+    refreshFollowed({ force: true })
+  }
+
+  return (
+    <Section title="Streaming region">
+      <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        Which services a show is on depends on the country. This only affects this phone.
+      </p>
+      <select
+        value={stored}
+        onChange={(e) => change(e.target.value)}
+        aria-label="Streaming region"
+        className="mt-3 h-11 w-full rounded-xl bg-neutral-100 px-3 text-base text-neutral-900 outline-none focus:ring-2 focus:ring-accent dark:bg-neutral-800 dark:text-neutral-100"
+      >
+        <option value="">Automatic ({regionName(detected)})</option>
+        {options.map((r) => (
+          <option key={r.code} value={r.code}>
+            {r.name}
+          </option>
+        ))}
+      </select>
+    </Section>
   )
 }
 

@@ -1,5 +1,5 @@
-import { db, type Show } from '../db'
-import { getShowDetails, type ShowDetails } from './tmdb'
+import { db, isOwned, type Show } from '../db'
+import { getShowDetails, getTmdbKey, type ShowDetails } from './tmdb'
 import { getEpisodes, lookupTvmazeId, sleep } from './tvmaze'
 import { createStore } from './store'
 import { errorMessage } from './toast'
@@ -31,8 +31,20 @@ export async function follow(tmdbId: number) {
 export async function unfollow(tmdbId: number) {
   await db.transaction('rw', db.shows, db.episodes, db.rankings, async () => {
     await db.episodes.where('tmdb_show_id').equals(tmdbId).delete()
-    // Keep the record if it's ranked; otherwise there's no reason to hold on to it.
-    if (await db.rankings.get(tmdbId)) await db.shows.update(tmdbId, { followed: false, followed_at: null })
+    const show = await db.shows.get(tmdbId)
+    if (!show) return
+    // Keep the record if it's ranked or owned; otherwise there's no reason to hold on to it.
+    if (isOwned(show) || (await db.rankings.get(tmdbId))) await db.shows.update(tmdbId, { followed: false, followed_at: null })
+    else await db.shows.delete(tmdbId)
+  })
+}
+
+/** Tick or untick "Own on DVD" / "Own on streaming". Saves the show if it isn't stored yet. */
+export async function setOwned(tmdbId: number, field: 'own_dvd' | 'own_streaming', value: boolean) {
+  const show = await loadShow(tmdbId)
+  await db.transaction('rw', db.shows, db.rankings, async () => {
+    const next: Show = { ...((await db.shows.get(tmdbId)) ?? show), [field]: value }
+    if (next.followed || isOwned(next) || (await db.rankings.get(tmdbId))) await db.shows.put(next)
     else await db.shows.delete(tmdbId)
   })
 }
@@ -65,7 +77,7 @@ const isStale = (s: Show) => !s.last_refreshed_at || Date.now() - Date.parse(s.l
  */
 export function refreshFollowed({ force = false } = {}): Promise<void> {
   if (inFlight) return inFlight
-  if (!navigator.onLine) return Promise.resolve()
+  if (!navigator.onLine || !getTmdbKey()) return Promise.resolve()
 
   inFlight = (async () => {
     const shows = (await db.shows.toArray()).filter((s) => s.followed && (force || isStale(s)))

@@ -3,6 +3,7 @@ import { isTab, useRoute, type Tab } from './lib/router'
 import { refreshFollowed } from './lib/shows'
 import { TabBar, Toast } from './components/Layout'
 import { Upcoming } from './screens/Upcoming'
+import { Shows } from './screens/Shows'
 import { Rankings } from './screens/Rankings'
 import { Search } from './screens/Search'
 import { Settings } from './screens/Settings'
@@ -11,6 +12,7 @@ import { RankFlow } from './screens/RankFlow'
 
 const SCREENS: Record<Tab, () => React.JSX.Element> = {
   upcoming: Upcoming,
+  shows: Shows,
   rankings: Rankings,
   search: Search,
   settings: Settings,

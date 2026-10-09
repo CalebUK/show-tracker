@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Episode } from '../db'
-import { getShowDetails, logoUrl, type ShowDetails } from '../lib/tmdb'
-import { follow, unfollow } from '../lib/shows'
+import { getShowDetails, logoUrl, regionName, useRegion, type ShowDetails } from '../lib/tmdb'
+import { follow, setOwned, unfollow } from '../lib/shows'
 import { BUCKETS, removeRanking } from '../lib/ranking'
 import { episodeLabel, formatAirTime, formatDateOnly } from '../lib/dates'
 import { navigate } from '../lib/router'
@@ -10,6 +10,9 @@ import { errorMessage, toast } from '../lib/toast'
 import { Button, Overlay } from '../components/Layout'
 import { Poster } from '../components/Poster'
 import { CheckIcon, ExternalIcon, PlusIcon, Spinner } from '../components/Icons'
+
+/** Subscription services come first, so the first few are the useful ones. */
+const STREAMING_PREVIEW = 6
 
 export function ShowDetail({ id }: { id: number }) {
   // undefined = still loading, null = not stored on this device
@@ -29,6 +32,7 @@ export function ShowDetail({ id }: { id: number }) {
   const [details, setDetails] = useState<ShowDetails | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const needsDetails = stored === null || (stored && !stored.followed)
+  const regionCode = useRegion()
   useEffect(() => {
     if (!needsDetails) return
     let cancelled = false
@@ -38,9 +42,10 @@ export function ShowDetail({ id }: { id: number }) {
     return () => {
       cancelled = true
     }
-  }, [id, needsDetails])
+  }, [id, needsDetails, regionCode])
 
   const [busy, setBusy] = useState(false)
+  const [showAllStreaming, setShowAllStreaming] = useState(false)
   const show = stored ?? (details ? { ...details.show, followed: false } : null)
 
   if (!show) {
@@ -75,7 +80,17 @@ export function ShowDetail({ id }: { id: number }) {
     toast('Removed from rankings')
   }
 
+  const toggleOwned = async (field: 'own_dvd' | 'own_streaming', value: boolean) => {
+    try {
+      await setOwned(id, field, value)
+    } catch (err) {
+      toast(errorMessage(err))
+    }
+  }
+
   const meta = [show.first_air_year, show.network, show.status].filter(Boolean).join(' · ')
+  // Prefer freshly fetched providers (shows that aren't followed don't get refreshed).
+  const streaming = details?.show.streaming ?? show.streaming
   const bucketLabel = ranking ? BUCKETS.find((b) => b.id === ranking.bucket)?.short : null
 
   return (
@@ -115,24 +130,47 @@ export function ShowDetail({ id }: { id: number }) {
 
         {show.overview && <p className="mt-6 text-[15px] leading-relaxed text-neutral-700 dark:text-neutral-300">{show.overview}</p>}
 
-        {show.streaming.length > 0 && (
-          <section className="mt-7">
-            <h2 className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Where to stream</h2>
-            <ul className="mt-3 flex flex-wrap gap-3">
-              {show.streaming.map((p) => (
-                <li key={p.id} className="flex items-center gap-2 rounded-full bg-neutral-100 py-1 pr-3 pl-1 text-sm dark:bg-neutral-800">
-                  {p.logo_path ? (
-                    <img src={logoUrl(p.logo_path)!} alt="" className="h-6 w-6 rounded-full" loading="lazy" />
-                  ) : (
-                    <span className="h-6 w-6" />
-                  )}
-                  {p.name}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-[11px] text-neutral-400">Streaming data from JustWatch</p>
-          </section>
-        )}
+        <section className="mt-7">
+          <h2 className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">
+            Where to stream · {regionName(regionCode)}
+          </h2>
+          {streaming.length > 0 ? (
+            <>
+              <ul className="mt-3 flex flex-wrap gap-3">
+                {(showAllStreaming ? streaming : streaming.slice(0, STREAMING_PREVIEW)).map((p) => (
+                  <li key={p.id} className="flex items-center gap-2 rounded-full bg-neutral-100 py-1 pr-3 pl-1 text-sm dark:bg-neutral-800">
+                    {p.logo_path ? (
+                      <img src={logoUrl(p.logo_path)!} alt="" className="h-6 w-6 rounded-full" loading="lazy" />
+                    ) : (
+                      <span className="h-6 w-6" />
+                    )}
+                    {p.name}
+                  </li>
+                ))}
+              </ul>
+              {!showAllStreaming && streaming.length > STREAMING_PREVIEW && (
+                <button onClick={() => setShowAllStreaming(true)} className="mt-3 text-sm text-accent-text">
+                  Show {streaming.length - STREAMING_PREVIEW} more
+                </button>
+              )}
+              <p className="mt-2 text-[11px] text-neutral-400">Streaming data from JustWatch</p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Not on any streaming service here right now.</p>
+          )}
+        </section>
+
+        <section className="mt-7">
+          <h2 className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Your copies</h2>
+          <div className="mt-2 divide-y divide-neutral-100 dark:divide-neutral-800">
+            <OwnToggle label="Own on DVD" checked={stored?.own_dvd === true} onChange={(v) => toggleOwned('own_dvd', v)} />
+            <OwnToggle
+              label="Own on streaming"
+              checked={stored?.own_streaming === true}
+              onChange={(v) => toggleOwned('own_streaming', v)}
+            />
+          </div>
+        </section>
 
         <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-[15px]">
           {show.imdb_id && (
@@ -192,5 +230,19 @@ function NextEpisode({
       <div className="mt-1 text-[15px] font-medium">{label}</div>
       <div className="text-sm text-neutral-500 tabular-nums dark:text-neutral-400">{when}</div>
     </section>
+  )
+}
+
+function OwnToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between py-3 text-[15px]">
+      {label}
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-5 w-5 cursor-pointer accent-accent"
+      />
+    </label>
   )
 }

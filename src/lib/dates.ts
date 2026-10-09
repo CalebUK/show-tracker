@@ -98,6 +98,16 @@ export function formatAirTime(ep: Pick<Episode, 'airstamp' | 'has_time'>, group:
   }
 }
 
+/** Compact relative wording: "Today 9:00 PM", "Tomorrow", "Thu", "Thu 23 Oct". */
+export function formatShortDate(ep: Pick<Episode, 'airstamp' | 'has_time'>, now = new Date()) {
+  const d = new Date(ep.airstamp)
+  const days = Math.round((startOfDay(d).getTime() - startOfDay(now).getTime()) / DAY_MS)
+  if (days === 0) return ep.has_time ? `Today ${time.format(d)}` : 'Today'
+  if (days === 1) return 'Tomorrow'
+  if (days > 1 && days < 7) return weekday.format(d)
+  return d.getFullYear() === now.getFullYear() ? monthDay.format(d) : fullDate.format(d)
+}
+
 /** For TMDB's date-only next-episode field ("2026-10-21"). */
 export function formatDateOnly(isoDate: string) {
   const [y, m, d] = isoDate.split('-').map(Number)
