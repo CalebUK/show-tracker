@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { episodeKey, type Episode, type Show, type Watched } from '../db'
-import { nextSeasonNote, progressFor } from './progress'
+import { isFinished, nextSeasonNote, progressFor } from './progress'
 
 const now = new Date('2026-10-09T12:00:00Z')
 let id = 1
@@ -58,6 +58,17 @@ const base: Show = {
   followed_at: null,
   last_refreshed_at: null,
 }
+
+describe('isFinished', () => {
+  const caughtUp = progressFor(episodes, [seen(1, 1), seen(1, 2), seen(2, 1)], now)
+  const behind = progressFor(episodes, [seen(1, 1)], now)
+  it('needs both: the show is over and every episode is ticked', () => {
+    expect(isFinished({ ...base, status: 'Ended' }, caughtUp)).toBe(true)
+    expect(isFinished({ ...base, status: 'Canceled' }, caughtUp)).toBe(true)
+    expect(isFinished({ ...base, status: 'Ended' }, behind)).toBe(false)
+    expect(isFinished(base, caughtUp)).toBe(false)
+  })
+})
 
 describe('nextSeasonNote', () => {
   it('uses the announced premiere date when TMDB has one', () => {

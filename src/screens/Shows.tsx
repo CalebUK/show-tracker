@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { isOwned, type Episode, type Show } from '../db'
+import type { Episode, Show } from '../db'
 import { episodeLabel, formatShortDate } from '../lib/dates'
-import { nextSeasonNote, type Progress } from '../lib/progress'
+import { isFinished, nextSeasonNote, type Progress } from '../lib/progress'
 import { navigate } from '../lib/router'
 import { useLibrary } from '../hooks/useLibrary'
 import { useNow } from '../hooks/useNow'
@@ -9,7 +9,7 @@ import { Button, Chips, EmptyState, ScreenHeader } from '../components/Layout'
 import { Poster } from '../components/Poster'
 import { PlusIcon } from '../components/Icons'
 
-type Filter = 'following' | 'notStarted' | 'owned'
+type Filter = 'following' | 'notStarted' | 'finished'
 
 // Kept outside the component so switching tabs doesn't reset the filter.
 let lastFilter: Filter = 'following'
@@ -43,13 +43,15 @@ export function Shows() {
   }
 
   const progress = (s: Show) => library!.progress.get(s.tmdb_id)!
+  const finished = (s: Show) => isFinished(s, progress(s))
   const lists = library && {
-    following: library.followed,
+    // Finished shows (ended and fully watched) move out of the main list into their own.
+    following: library.followed.filter((s) => !finished(s)),
     notStarted: library.followed.filter((s) => !progress(s).started),
-    owned: library.shows.filter(isOwned),
+    finished: library.followed.filter(finished),
   }
-  const hasAny = lists && (lists.following.length > 0 || lists.owned.length > 0)
-  const canHide = filter !== 'notStarted'
+  const hasAny = (library?.followed.length ?? 0) > 0
+  const canHide = filter === 'following'
   const shows = (lists?.[filter] ?? []).filter((s) => !(canHide && hideCaughtUp && progress(s).caughtUp))
   const hiddenCount = (lists?.[filter].length ?? 0) - shows.length
 
@@ -69,13 +71,13 @@ export function Shows() {
           ) : null
         }
       >
-        {hasAny && (
+        {hasAny && lists && (
           <>
             <Chips
               options={[
                 { id: 'following', label: 'Following', count: lists.following.length },
                 { id: 'notStarted', label: 'Not started', count: lists.notStarted.length },
-                { id: 'owned', label: 'Owned', count: lists.owned.length },
+                { id: 'finished', label: 'Finished', count: lists.finished.length },
               ]}
               value={filter}
               onChange={setFilter}
@@ -103,7 +105,9 @@ export function Shows() {
           action={<Button onClick={() => navigate('/search', { replace: true })}>Find a show</Button>}
         />
       ) : lists && shows.length === 0 ? (
-        <p className="px-5 pt-8 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">{emptyMessage(filter, hiddenCount)}</p>
+        <p className="px-5 pt-8 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+          {emptyMessage(filter, hiddenCount, lists.finished.length)}
+        </p>
       ) : (
         <ul className="pb-6">
           {shows.map((show) => (
@@ -116,8 +120,8 @@ export function Shows() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[15px] font-medium">{show.name}</div>
                   <div className="truncate text-sm text-neutral-500 dark:text-neutral-400">
-                    {filter === 'owned'
-                      ? ownedLine(show)
+                    {filter === 'finished'
+                      ? finishedLine(show, progress(show))
                       : statusLine(show, progress(show), library!.nextUp.get(show.tmdb_id), now)}
                   </div>
                 </div>
@@ -130,10 +134,11 @@ export function Shows() {
   )
 }
 
-function emptyMessage(filter: Filter, hidden: number) {
+function emptyMessage(filter: Filter, hidden: number, finishedCount: number) {
   if (hidden > 0) return "You're caught up on everything here. Untick Hide caught up to see them."
-  if (filter === 'owned') return 'Nothing marked as owned yet. Open a show and tick Own on DVD or Own on streaming.'
+  if (filter === 'finished') return "Shows that have ended and you've watched every episode of will move here."
   if (filter === 'notStarted') return "You've started everything you follow."
+  if (finishedCount > 0) return "You've finished everything you follow. They're under Finished."
   return "You're not following anything. Follow shows from Search to see them here."
 }
 
@@ -148,6 +153,6 @@ function statusLine(show: Show, p: Progress, nextUp: Episode | undefined, now: D
   return scheduled ? `Caught up · next ${scheduled}` : `Caught up · ${nextSeasonNote(show)}`
 }
 
-function ownedLine(show: Show) {
-  return [show.own_dvd && 'On DVD', show.own_streaming && 'On streaming'].filter(Boolean).join(' · ')
+function finishedLine(show: Show, p: Progress) {
+  return `${show.status === 'Canceled' ? 'Cancelled' : 'Ended'} · watched all ${p.aired} episode${p.aired === 1 ? '' : 's'}`
 }

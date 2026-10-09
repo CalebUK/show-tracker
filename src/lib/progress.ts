@@ -42,6 +42,11 @@ export function progressFor(episodes: Episode[], watched: Watched[], now = new D
   }
 }
 
+const isOver = (show: Show) => show.status === 'Ended' || show.status === 'Canceled'
+
+/** Done for good: the show has ended (or been cancelled) and you've seen every episode. */
+export const isFinished = (show: Show, progress: Progress) => progress.caughtUp && isOver(show)
+
 /** What TMDB knows about what's next, for shows with nothing on the schedule. */
 export function nextSeasonNote(show: Show) {
   const next = show.next_air
