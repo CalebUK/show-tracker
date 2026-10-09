@@ -1,6 +1,6 @@
 # Show Tracker
 
-A minimalist personal TV tracker, installable as a PWA: **what's coming up** for the shows you follow, and **Beli-style rankings** for the shows you've watched. All data stays on the phone (IndexedDB). See [show-tracker-spec.md](show-tracker-spec.md) for the full spec.
+A minimalist personal TV tracker, installable as a PWA: **what's coming up** for the shows you follow, and **comparison-based (Elo) rankings** for the shows you've watched. All data stays on the phone (IndexedDB). See [show-tracker-spec.md](show-tracker-spec.md) for the full spec.
 
 ## Setup
 
@@ -47,7 +47,8 @@ src/
   lib/tmdb.ts           Search, details, external IDs, streaming providers
   lib/tvmaze.ts         IMDb → TVmaze lookup, episode schedules (with 429 back-off)
   lib/shows.ts          Follow/unfollow, per-show refresh, 12-hour stale refresh queue
-  lib/ranking.ts        Scores, binary-insertion steps, placing/removing shows in buckets
+  lib/elo.ts            Elo maths: ratings ↔ scores, updates, picking the next comparison
+  lib/ranking.ts        Saving and removing rankings, sort order
   lib/dates.ts          Today / This week / Later grouping, local-time formatting
   lib/backup.ts         Export (share sheet or download), validated import
   lib/router.ts         Tiny hash router (Android back button works)
@@ -56,13 +57,13 @@ src/
 
 A few choices the spec left open:
 
-- **Later** shows only each show's *next* episode, so a fully scheduled season doesn't flood the list. Today and This week show everything.
+- **On air** lists each show once, at its next episode: under Today, This week or Later. A fully scheduled season, or a show airing today and again later in the week, never shows up twice.
 - Episodes of one show that drop at the same moment (a Netflix-style season release) collapse into one row: "S2 E1–8 · 8 episodes".
-- Every episode of a followed show is stored (past and future), so past episodes can be ticked as watched. Ticks are kept in their own table keyed by show/season/episode, survive refreshes and unfollowing, and are included in backups (backup format v2; v1 files still import).
-- "Too close to call" places the show directly below the one it was compared with.
-- Re-ranking keeps the old position until the new one is confirmed, so backing out changes nothing.
+- Every episode of a followed show is stored (past and future), so past episodes can be ticked as watched. Ticks are kept in their own table keyed by show/season/episode, survive refreshes and unfollowing, and are included in backups (current backup format is v3; older files still import).
+- **Rankings use Elo.** Pick Liked it / It was fine / Didn't like it (which sets a starting rating in the middle of that bucket), then answer up to 6 "Which was better?" questions against your closest-rated ranked shows. Each answer moves both shows' ratings; "Too close to call" is a draw. A rating of 1500 is a 5.0 and every 100 points is one point of score, kept inside the bucket's range (Liked 6.8–10, Fine 3.4–6.7, Didn't like 0–3.3). "Compare more" fine-tunes a ranked show; picking a bucket again starts it over. Shows you've ticked episodes of but not ranked appear under "Ready to rank".
+- Nothing is saved until the last question is answered, so backing out of a ranking changes nothing. Rankings from before the Elo switch convert straight to ratings with the same scores.
 - **Own on DVD / Own on streaming** ticks live on each show page and are included in backups. Ticking a show you don't follow saves it.
 - A show is kept on the device while it's followed, ranked or owned; once none of those apply, it's deleted.
 - **Where to stream** is per country. Each phone guesses its region from the language setting (`en-GB` → United Kingdom) and can override it in Settings → Streaming region. Subscription services are listed first, then free ones (BBC iPlayer, ITVX…), then ad-supported; rent/buy is left out. Store variants like "Netflix Standard with Ads" are folded into the main service, and only the first six show until you tap "Show more".
 - **Upcoming** has two views. **On air** is the schedule; a show you have started but are behind on shows "N to catch up". **Off air** lists followed shows with nothing scheduled: **Up next** (your next unwatched episode, with a tick to mark it), **Not started**, and **Caught up** with what TMDB knows about the next season ("Season 3 announced, no date yet").
-- The **Shows** tab lists everything you follow A–Z with where you are up to, plus **Not started** and **Owned** filters and a **Hide caught up** tick box. "Not started" is automatic: a show with no episodes ticked.
+- The **Shows** tab lists everything you follow A–Z with where you are up to. **Not started** is automatic (no episodes ticked). **Finished** shows (ended or cancelled, every episode ticked) move out of Following into their own filter. **Hide caught up** hides shows you are up to date on that are still coming back.

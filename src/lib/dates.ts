@@ -21,9 +21,9 @@ export interface UpcomingGroups {
 }
 
 /**
- * Today = anything airing on the current local calendar day (including earlier today).
- * This week = the next six days. Later = only each show's next episode, to keep it short.
- * `episodes` must be sorted by airstamp.
+ * Each show is listed once, at its next episode (or binge drop): under Today if it airs on
+ * the current local calendar day (including earlier today), This week for the next six days,
+ * otherwise Later. `episodes` must be sorted by airstamp.
  */
 export function groupUpcoming(episodes: Episode[], shows: Map<number, Show>, now = new Date()): UpcomingGroups {
   const today = startOfDay(now).getTime()
@@ -48,21 +48,14 @@ export function groupUpcoming(episodes: Episode[], shows: Map<number, Show>, now
   for (const row of rows) row.episodes.sort((a, b) => a.season - b.season || (a.number ?? 0) - (b.number ?? 0))
 
   const groups: UpcomingGroups = { today: [], week: [], later: [] }
-  const seenLater = new Set<number>()
-  const seenSoon = new Set<number>()
+  const listed = new Set<number>()
   for (const row of rows) {
     const t = Date.parse(row.airstamp)
-    if (t < today) continue
-    if (t < tomorrow) {
-      groups.today.push(row)
-      seenSoon.add(row.show.tmdb_id)
-    } else if (t < weekEnd) {
-      groups.week.push(row)
-      seenSoon.add(row.show.tmdb_id)
-    } else if (!seenSoon.has(row.show.tmdb_id) && !seenLater.has(row.show.tmdb_id)) {
-      groups.later.push(row)
-      seenLater.add(row.show.tmdb_id)
-    }
+    if (t < today || listed.has(row.show.tmdb_id)) continue
+    listed.add(row.show.tmdb_id)
+    if (t < tomorrow) groups.today.push(row)
+    else if (t < weekEnd) groups.week.push(row)
+    else groups.later.push(row)
   }
   return groups
 }
