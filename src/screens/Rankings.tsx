@@ -3,8 +3,9 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Bucket } from '../db'
 import { BUCKETS, sortRankings } from '../lib/ranking'
 import { navigate } from '../lib/router'
-import { Button, EmptyState, ScreenHeader } from '../components/Layout'
+import { Button, Chips, EmptyState, ScreenHeader } from '../components/Layout'
 import { Poster } from '../components/Poster'
+import { ReadyToRank } from './RankFlow'
 
 export function Rankings() {
   const [filter, setFilter] = useState<Bucket | 'all'>('all')
@@ -21,33 +22,21 @@ export function Rankings() {
   return (
     <>
       <ScreenHeader title="Rankings">
-        {rows && rows.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto px-5 pb-3">
-            {chips.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setFilter(c.id)}
-                className={`h-8 shrink-0 rounded-full px-3.5 text-sm font-medium transition ${
-                  filter === c.id
-                    ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
-                    : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-        )}
+        {rows && rows.length > 0 && <Chips options={chips} value={filter} onChange={setFilter} />}
       </ScreenHeader>
+
+      <div className="px-5">
+        <ReadyToRank />
+      </div>
 
       {rows && rows.length === 0 ? (
         <EmptyState
           title="No rankings yet"
-          body="Rank shows you've watched. You'll never type a score; a few quick comparisons place each show."
+          body="Rank shows you've watched. You'll never type a score: pick how you felt, then answer a few “Which was better?” questions."
           action={<Button onClick={() => navigate('/search', { replace: true })}>Find a show to rank</Button>}
         />
       ) : (
-        <ul className="pb-6">
+        <ul className="pt-2 pb-6">
           {visible.map(({ ranking, show }) => (
             <li key={ranking.tmdb_show_id}>
               <button

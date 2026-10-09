@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Episode } from '../db'
 import { getShowDetails, logoUrl, regionName, useRegion, type ShowDetails } from '../lib/tmdb'
 import { follow, setOwned, unfollow } from '../lib/shows'
-import { BUCKETS, removeRanking } from '../lib/ranking'
+import { BUCKETS, removeRanking, sortRankings } from '../lib/ranking'
 import { episodeLabel, formatAirTime, formatDateOnly } from '../lib/dates'
 import { navigate } from '../lib/router'
 import { errorMessage, toast } from '../lib/toast'
@@ -20,10 +20,12 @@ export function ShowDetail({ id }: { id: number }) {
   // undefined = still loading, null = not stored on this device
   const stored = useLiveQuery(() => db.shows.get(id).then((s) => s ?? null), [id])
   const ranking = useLiveQuery(() => db.rankings.get(id).then((r) => r ?? null), [id])
-  const bucketCount = useLiveQuery(
-    () => (ranking ? db.rankings.where('bucket').equals(ranking.bucket).count() : Promise.resolve(0)),
-    [ranking?.bucket],
-  )
+  // Where this show sits within its bucket, best first.
+  const bucketRank = useLiveQuery(async () => {
+    if (!ranking) return null
+    const list = (await db.rankings.where('bucket').equals(ranking.bucket).toArray()).sort(sortRankings)
+    return { place: list.findIndex((r) => r.tmdb_show_id === id) + 1, count: list.length }
+  }, [ranking, id])
   const nextEpisode = useLiveQuery(async () => {
     const nowIso = new Date().toISOString()
     const eps = await db.episodes.where('tmdb_show_id').equals(id).sortBy('airstamp')
@@ -107,7 +109,7 @@ export function ShowDetail({ id }: { id: number }) {
               <div className="mt-4 flex items-baseline gap-2">
                 <span className="text-3xl font-semibold text-accent-text tabular-nums">{ranking.score.toFixed(1)}</span>
                 <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                  {bucketLabel} · #{ranking.position + 1} of {bucketCount ?? '…'}
+                  {bucketLabel}{bucketRank ? ` · #${bucketRank.place} of ${bucketRank.count}` : ''}
                 </span>
               </div>
             )}

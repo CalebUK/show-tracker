@@ -1,10 +1,10 @@
 import { db, episodeKey, setMeta, type Bucket, type Episode, type Ranking, type Show, type Watched } from '../db'
-import { scoreFor } from './ranking'
+import { ratingToScore, scoreToRating, startingRating } from './elo'
 
 export interface BackupFile {
   app: 'show-tracker'
-  /** 1 = before watched episodes existed; still accepted on import. */
-  version: 2
+  /** 1 = no watched episodes, 2 = rankings by position. Both still import. */
+  version: 3
   exported_at: string
   shows: Show[]
   episodes: Episode[]
@@ -19,7 +19,7 @@ export async function buildBackup(): Promise<File> {
     db.rankings.toArray(),
     db.watched.toArray(),
   ])
-  const backup: BackupFile = { app: 'show-tracker', version: 2, exported_at: new Date().toISOString(), shows, episodes, rankings, watched }
+  const backup: BackupFile = { app: 'show-tracker', version: 3, exported_at: new Date().toISOString(), shows, episodes, rankings, watched }
   const d = new Date()
   const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   return new File([JSON.stringify(backup, null, 2)], `show-tracker-backup-${stamp}.json`, { type: 'application/json' })
@@ -74,7 +74,7 @@ export function parseBackup(text: string): BackupFile {
     throw new Error("That file isn't valid JSON.")
   }
   if (!isObj(data) || data.app !== 'show-tracker') throw new Error("That doesn't look like a Show Tracker backup.")
-  if (data.version !== 1 && data.version !== 2) throw new Error(`Unsupported backup version: ${String(data.version)}`)
+  if (data.version !== 1 && data.version !== 2 && data.version !== 3) throw new Error(`Unsupported backup version: ${String(data.version)}`)
   if (!Array.isArray(data.shows) || !Array.isArray(data.episodes) || !Array.isArray(data.rankings)) {
     throw new Error('The backup is missing shows, episodes or rankings.')
   }
@@ -125,15 +125,19 @@ export function parseBackup(text: string): BackupFile {
   })
 
   const rankings: Ranking[] = data.rankings.map((r, i) => {
-    if (!isObj(r) || !num(r.tmdb_show_id) || !BUCKETS.includes(r.bucket as Bucket) || !num(r.position)) {
+    if (!isObj(r) || !num(r.tmdb_show_id) || !BUCKETS.includes(r.bucket as Bucket)) {
       throw new Error(`Ranking #${i + 1} is invalid.`)
     }
     if (!showIds.has(r.tmdb_show_id as number)) throw new Error(`Ranking #${i + 1} refers to a show that isn't in the backup.`)
+    const bucket = r.bucket as Bucket
+    // Older backups have no rating; their score converts straight to one.
+    const rating = num(r.rating) ? (r.rating as number) : num(r.score) ? scoreToRating(r.score as number) : startingRating(bucket)
     return {
       tmdb_show_id: r.tmdb_show_id as number,
-      bucket: r.bucket as Bucket,
-      position: r.position as number,
-      score: num(r.score) ? (r.score as number) : 0,
+      bucket,
+      rating,
+      comparisons: num(r.comparisons) ? (r.comparisons as number) : 0,
+      score: ratingToScore(bucket, rating),
       ranked_at: typeof r.ranked_at === 'string' ? r.ranked_at : new Date().toISOString(),
     }
   })
@@ -150,15 +154,7 @@ export function parseBackup(text: string): BackupFile {
     }
   })
 
-  return { app: 'show-tracker', version: 2, exported_at: strOrNull(data.exported_at) ?? '', shows, episodes, rankings, watched }
-}
-
-/** Positions are the source of truth; renumber them 0..n-1 per bucket and recompute scores. */
-export function normalizeRankings(rankings: Ranking[]): Ranking[] {
-  return BUCKETS.flatMap((bucket) => {
-    const list = rankings.filter((r) => r.bucket === bucket).sort((a, b) => a.position - b.position)
-    return list.map((r, position) => ({ ...r, position, score: scoreFor(bucket, position, list.length) }))
-  })
+  return { app: 'show-tracker', version: 3, exported_at: strOrNull(data.exported_at) ?? '', shows, episodes, rankings, watched }
 }
 
 /** Replace everything on this device with the backup's contents. */
@@ -167,7 +163,7 @@ export async function restoreBackup(backup: BackupFile) {
     await Promise.all([db.shows.clear(), db.episodes.clear(), db.rankings.clear(), db.watched.clear()])
     await db.shows.bulkPut(backup.shows)
     await db.episodes.bulkPut(backup.episodes)
-    await db.rankings.bulkPut(normalizeRankings(backup.rankings))
+    await db.rankings.bulkPut(backup.rankings)
     await db.watched.bulkPut(backup.watched)
   })
 }

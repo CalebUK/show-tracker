@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeRankings, parseBackup } from './backup'
+import { parseBackup } from './backup'
 
 const valid = {
   app: 'show-tracker',
@@ -36,15 +36,16 @@ describe('parseBackup', () => {
   })
 })
 
-describe('normalizeRankings', () => {
-  it('renumbers positions and recomputes scores per bucket', () => {
-    const out = normalizeRankings([
-      { tmdb_show_id: 1, bucket: 'fine', position: 5, score: 0, ranked_at: '' },
-      { tmdb_show_id: 2, bucket: 'fine', position: 2, score: 0, ranked_at: '' },
-    ])
-    expect(out.map((r) => [r.tmdb_show_id, r.position, r.score])).toEqual([
-      [2, 0, 6.7],
-      [1, 1, 3.4],
-    ])
+describe('rankings in backups', () => {
+  it('converts old position-based rankings to ratings without changing their scores', () => {
+    const b = parseBackup(JSON.stringify(valid)) // version 1: score 10, no rating
+    expect(b.rankings[0]).toMatchObject({ bucket: 'liked', rating: 2000, comparisons: 0, score: 10 })
+  })
+
+  it('keeps ratings from new backups and recomputes the score from them', () => {
+    const b = parseBackup(
+      JSON.stringify({ ...valid, version: 3, rankings: [{ tmdb_show_id: 2, bucket: 'fine', rating: 1580, comparisons: 4, score: 99 }] }),
+    )
+    expect(b.rankings[0]).toMatchObject({ rating: 1580, comparisons: 4, score: 5.8 })
   })
 })

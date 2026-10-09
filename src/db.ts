@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
+import { scoreToRating } from './lib/elo'
 
 export interface Provider {
   id: number
@@ -68,9 +69,11 @@ export type Bucket = 'liked' | 'fine' | 'disliked'
 export interface Ranking {
   tmdb_show_id: number
   bucket: Bucket
-  /** Order within the bucket; 0 = best. */
-  position: number
-  /** 0.0–10.0, derived from bucket + position, never entered. */
+  /** Elo rating, moved by "Which was better?" answers. */
+  rating: number
+  /** How many comparisons this show has been part of. */
+  comparisons: number
+  /** 0.0–10.0, derived from the rating and kept inside the bucket's range. Never entered. */
   score: number
   ranked_at: string
 }
@@ -106,6 +109,21 @@ db.version(2)
       .toCollection()
       .modify((s: Show) => {
         if (s.followed) s.last_refreshed_at = null
+      }),
+  )
+
+db.version(3)
+  .stores({ rankings: 'tmdb_show_id, bucket' })
+  .upgrade((tx) =>
+    // Rankings switched from ordered positions to Elo ratings. Each show's existing
+    // score converts straight to a rating, so nothing moves.
+    tx
+      .table('rankings')
+      .toCollection()
+      .modify((r: Ranking & { position?: number }) => {
+        if (typeof r.rating !== 'number') r.rating = scoreToRating(r.score)
+        if (typeof r.comparisons !== 'number') r.comparisons = 0
+        delete r.position
       }),
   )
 
