@@ -41,17 +41,14 @@ interface TvmazeEpisode {
   airstamp: string | null
 }
 
-/** Only keep episodes from the last couple of days onward; older ones aren't shown anywhere. */
-const KEEP_PAST_MS = 2 * 24 * 60 * 60 * 1000
-
+/** The full episode list (past and future), so past episodes can be ticked as watched. */
 export async function getEpisodes(tvmazeId: number, tmdbShowId: number): Promise<Episode[]> {
   const list = (await get<TvmazeEpisode[]>(`/shows/${tvmazeId}/episodes`)) ?? []
-  const cutoff = Date.now() - KEEP_PAST_MS
   const out: Episode[] = []
   for (const e of list) {
     if (!e.airstamp) continue
     const t = Date.parse(e.airstamp)
-    if (Number.isNaN(t) || t < cutoff) continue
+    if (Number.isNaN(t)) continue
     out.push({
       id: e.id,
       tmdb_show_id: tmdbShowId,

@@ -135,6 +135,9 @@ interface TmdbDetails {
     episode_number: number
     name: string
   } | null
+  last_episode_to_air?: { season_number: number } | null
+  in_production?: boolean
+  seasons?: { season_number: number }[]
   external_ids?: { imdb_id: string | null; tvdb_id: number | null }
   'watch/providers'?: {
     results: Record<string, Partial<Record<'flatrate' | 'free' | 'ads', TmdbProvider[]>>>
@@ -150,7 +153,7 @@ interface TmdbProvider {
 
 export interface ShowDetails {
   /** Fields that map straight onto a stored Show record. */
-  show: Omit<Show, 'tvmaze_id' | 'followed' | 'followed_at' | 'last_refreshed_at'>
+  show: Omit<Show, 'tvmaze_id' | 'followed' | 'followed_at' | 'last_refreshed_at' | 'own_dvd' | 'own_streaming'>
   tvdb_id: number | null
   /** TMDB's own idea of the next episode; used for shows that aren't followed (no TVmaze data yet). */
   next_episode: { air_date: string; season: number; number: number; name: string } | null
@@ -197,6 +200,7 @@ function streamingFor(d: TmdbDetails): Provider[] {
 function toDetails(d: TmdbDetails): ShowDetails {
   const streaming = streamingFor(d)
   const next = d.next_episode_to_air
+  const seasons = (d.seasons ?? []).map((s) => s.season_number).filter((n) => n > 0)
   return {
     show: {
       tmdb_id: d.id,
@@ -208,6 +212,10 @@ function toDetails(d: TmdbDetails): ShowDetails {
       network: d.networks?.[0]?.name ?? null,
       streaming,
       first_air_year: d.first_air_date ? d.first_air_date.slice(0, 4) : null,
+      next_air: next?.air_date ? { date: next.air_date, season: next.season_number, number: next.episode_number } : null,
+      in_production: d.in_production === true,
+      latest_season: seasons.length ? Math.max(...seasons) : null,
+      last_aired_season: d.last_episode_to_air?.season_number ?? null,
     },
     tvdb_id: d.external_ids?.tvdb_id ?? null,
     next_episode: next?.air_date

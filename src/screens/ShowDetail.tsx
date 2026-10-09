@@ -9,6 +9,8 @@ import { navigate } from '../lib/router'
 import { errorMessage, toast } from '../lib/toast'
 import { Button, Overlay } from '../components/Layout'
 import { Poster } from '../components/Poster'
+import { EpisodeList } from '../components/EpisodeList'
+import { nextSeasonNote } from '../lib/progress'
 import { CheckIcon, ExternalIcon, PlusIcon, Spinner } from '../components/Icons'
 
 /** Subscription services come first, so the first few are the useful ones. */
@@ -125,7 +127,7 @@ export function ShowDetail({ id }: { id: number }) {
         <NextEpisode
           stored={nextEpisode ?? null}
           fallback={!show.followed ? details?.next_episode ?? null : null}
-          followed={show.followed}
+          note={stored?.followed ? nextSeasonNote(stored) : null}
         />
 
         {show.overview && <p className="mt-6 text-[15px] leading-relaxed text-neutral-700 dark:text-neutral-300">{show.overview}</p>}
@@ -172,6 +174,15 @@ export function ShowDetail({ id }: { id: number }) {
           </div>
         </section>
 
+        {stored?.followed ? (
+          <EpisodeList show={stored} />
+        ) : (
+          <section className="mt-8">
+            <h2 className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Episodes</h2>
+            <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Follow this show to tick off the episodes you've watched.</p>
+          </section>
+        )}
+
         <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-[15px]">
           {show.imdb_id && (
             <a
@@ -205,11 +216,12 @@ export function ShowDetail({ id }: { id: number }) {
 function NextEpisode({
   stored,
   fallback,
-  followed,
+  note,
 }: {
   stored: Episode | null
   fallback: ShowDetails['next_episode']
-  followed: boolean
+  /** What TMDB says is next when nothing is scheduled (e.g. "Season 6 announced, no date yet"). */
+  note: string | null
 }) {
   let label: string | null = null
   let when: string | null = null
@@ -221,12 +233,17 @@ function NextEpisode({
     when = formatDateOnly(fallback.air_date)
   }
   if (!label) {
-    if (!followed) return null
-    return <p className="mt-6 text-sm text-neutral-500 dark:text-neutral-400">No upcoming episodes scheduled.</p>
+    if (!note) return null
+    return (
+      <section className="mt-6 rounded-xl bg-neutral-50 px-4 py-3 dark:bg-neutral-900">
+        <div className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Next to air</div>
+        <div className="mt-1 text-[15px]">{note}</div>
+      </section>
+    )
   }
   return (
     <section className="mt-6 rounded-xl bg-neutral-50 px-4 py-3 dark:bg-neutral-900">
-      <div className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Next episode</div>
+      <div className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Next to air</div>
       <div className="mt-1 text-[15px] font-medium">{label}</div>
       <div className="text-sm text-neutral-500 tabular-nums dark:text-neutral-400">{when}</div>
     </section>

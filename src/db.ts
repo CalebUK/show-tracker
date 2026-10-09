@@ -24,6 +24,13 @@ export interface Show {
   /** Ticked by the user on the show page. Optional so records saved before these existed still load. */
   own_dvd?: boolean
   own_streaming?: boolean
+  /** From TMDB: the next announced episode (often a season premiere), if there is one. */
+  next_air?: { date: string; season: number; number: number } | null
+  in_production?: boolean
+  /** Highest season TMDB lists; a new season can be listed before it has a date. */
+  latest_season?: number | null
+  /** Season of the most recently aired episode. */
+  last_aired_season?: number | null
 }
 
 export const isOwned = (s: Show) => s.own_dvd === true || s.own_streaming === true
@@ -40,6 +47,21 @@ export interface Episode {
   /** False when TVmaze only knows the date, not the time. */
   has_time: boolean
 }
+
+/**
+ * An episode you've seen. Keyed by show/season/number rather than the TVmaze id, so ticks
+ * survive refreshes and don't depend on where the episode list came from.
+ */
+export interface Watched {
+  /** `${tmdb_show_id}:${season}:${number}` */
+  id: string
+  tmdb_show_id: number
+  season: number
+  number: number
+  watched_at: string
+}
+
+export const episodeKey = (showId: number, season: number, number: number) => `${showId}:${season}:${number}`
 
 export type Bucket = 'liked' | 'fine' | 'disliked'
 
@@ -63,6 +85,7 @@ export const db = new Dexie('show-tracker') as Dexie & {
   shows: EntityTable<Show, 'tmdb_id'>
   episodes: EntityTable<Episode, 'id'>
   rankings: EntityTable<Ranking, 'tmdb_show_id'>
+  watched: EntityTable<Watched, 'id'>
   meta: EntityTable<Meta, 'key'>
 }
 
@@ -72,6 +95,19 @@ db.version(1).stores({
   rankings: 'tmdb_show_id, bucket',
   meta: 'key',
 })
+
+db.version(2)
+  .stores({ watched: 'id, tmdb_show_id' })
+  .upgrade((tx) =>
+    // Version 1 only kept upcoming episodes. Mark followed shows stale so the next
+    // refresh pulls their full episode list (needed for ticking past episodes).
+    tx
+      .table('shows')
+      .toCollection()
+      .modify((s: Show) => {
+        if (s.followed) s.last_refreshed_at = null
+      }),
+  )
 
 export async function getMeta<T>(key: string): Promise<T | undefined> {
   return (await db.meta.get(key))?.value as T | undefined

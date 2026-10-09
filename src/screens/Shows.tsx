@@ -1,42 +1,57 @@
 import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db, isOwned, type Episode, type Show } from '../db'
-import { episodeLabel, formatShortDate, startOfDay } from '../lib/dates'
-import { isOngoing } from '../lib/tmdb'
+import { isOwned, type Episode, type Show } from '../db'
+import { episodeLabel, formatShortDate } from '../lib/dates'
+import { nextSeasonNote, type Progress } from '../lib/progress'
 import { navigate } from '../lib/router'
+import { useLibrary } from '../hooks/useLibrary'
 import { useNow } from '../hooks/useNow'
-import { Button, EmptyState, ScreenHeader } from '../components/Layout'
+import { Button, Chips, EmptyState, ScreenHeader } from '../components/Layout'
 import { Poster } from '../components/Poster'
 import { PlusIcon } from '../components/Icons'
 
-type Filter = 'following' | 'owned'
-
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: 'following', label: 'Following' },
-  { id: 'owned', label: 'Owned' },
-]
+type Filter = 'following' | 'notStarted' | 'owned'
 
 // Kept outside the component so switching tabs doesn't reset the filter.
 let lastFilter: Filter = 'following'
 
-/** Every show you follow (or own), A–Z, including ended ones that never appear on Upcoming. */
+const HIDE_KEY = 'shows.hideCaughtUp'
+function loadHide() {
+  try {
+    return localStorage.getItem(HIDE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+function saveHide(value: boolean) {
+  try {
+    localStorage.setItem(HIDE_KEY, value ? '1' : '0')
+  } catch {
+    // Private mode or blocked storage: the setting just won't stick.
+  }
+}
+
+/** Every show you follow (or own), A–Z, with where you're up to. */
 export function Shows() {
   const now = useNow()
-  const todayIso = startOfDay(now).toISOString()
+  const library = useLibrary(now)
   const [filter, setFilterState] = useState<Filter>(lastFilter)
   const setFilter = (f: Filter) => setFilterState((lastFilter = f))
+  const [hideCaughtUp, setHideState] = useState(loadHide)
+  const setHide = (v: boolean) => {
+    saveHide(v)
+    setHideState(v)
+  }
 
-  const data = useLiveQuery(async () => {
-    const all = (await db.shows.toArray()).sort((a, b) => a.name.localeCompare(b.name))
-    const next = new Map<number, Episode>()
-    for (const ep of await db.episodes.where('airstamp').aboveOrEqual(todayIso).sortBy('airstamp')) {
-      if (!next.has(ep.tmdb_show_id)) next.set(ep.tmdb_show_id, ep)
-    }
-    return { following: all.filter((s) => s.followed), owned: all.filter(isOwned), next }
-  }, [todayIso])
-
-  const hasAny = data && (data.following.length > 0 || data.owned.length > 0)
-  const shows = data?.[filter] ?? []
+  const progress = (s: Show) => library!.progress.get(s.tmdb_id)!
+  const lists = library && {
+    following: library.followed,
+    notStarted: library.followed.filter((s) => !progress(s).started),
+    owned: library.shows.filter(isOwned),
+  }
+  const hasAny = lists && (lists.following.length > 0 || lists.owned.length > 0)
+  const canHide = filter !== 'notStarted'
+  const shows = (lists?.[filter] ?? []).filter((s) => !(canHide && hideCaughtUp && progress(s).caughtUp))
+  const hiddenCount = (lists?.[filter].length ?? 0) - shows.length
 
   return (
     <>
@@ -55,36 +70,40 @@ export function Shows() {
         }
       >
         {hasAny && (
-          <div className="flex gap-2 px-5 pb-3">
-            {FILTERS.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFilter(f.id)}
-                className={`h-8 shrink-0 rounded-full px-3.5 text-sm font-medium transition ${
-                  filter === f.id
-                    ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
-                    : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
-                }`}
-              >
-                {f.label} {data[f.id].length > 0 && <span className="opacity-60">{data[f.id].length}</span>}
-              </button>
-            ))}
-          </div>
+          <>
+            <Chips
+              options={[
+                { id: 'following', label: 'Following', count: lists.following.length },
+                { id: 'notStarted', label: 'Not started', count: lists.notStarted.length },
+                { id: 'owned', label: 'Owned', count: lists.owned.length },
+              ]}
+              value={filter}
+              onChange={setFilter}
+            />
+            {canHide && (
+              <label className="flex cursor-pointer items-center gap-2 px-5 pb-3 text-sm text-neutral-600 dark:text-neutral-300">
+                <input
+                  type="checkbox"
+                  checked={hideCaughtUp}
+                  onChange={(e) => setHide(e.target.checked)}
+                  className="h-4 w-4 cursor-pointer accent-accent"
+                />
+                Hide caught up
+                {hideCaughtUp && hiddenCount > 0 && <span className="text-neutral-400">({hiddenCount} hidden)</span>}
+              </label>
+            )}
+          </>
         )}
       </ScreenHeader>
 
-      {data && !hasAny ? (
+      {lists && !hasAny ? (
         <EmptyState
           title="You're not following anything"
           body="Follow shows from Search and they'll all be listed here."
           action={<Button onClick={() => navigate('/search', { replace: true })}>Find a show</Button>}
         />
-      ) : data && shows.length === 0 ? (
-        <p className="px-5 pt-8 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-          {filter === 'owned'
-            ? "Nothing marked as owned yet. Open a show and tick Own on DVD or Own on streaming."
-            : "You're not following anything. Follow shows from Search to see them here."}
-        </p>
+      ) : lists && shows.length === 0 ? (
+        <p className="px-5 pt-8 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">{emptyMessage(filter, hiddenCount)}</p>
       ) : (
         <ul className="pb-6">
           {shows.map((show) => (
@@ -97,7 +116,9 @@ export function Shows() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[15px] font-medium">{show.name}</div>
                   <div className="truncate text-sm text-neutral-500 dark:text-neutral-400">
-                    {filter === 'owned' ? ownedLine(show) : statusLine(show, data?.next.get(show.tmdb_id), now)}
+                    {filter === 'owned'
+                      ? ownedLine(show)
+                      : statusLine(show, progress(show), library!.nextUp.get(show.tmdb_id), now)}
                   </div>
                 </div>
               </button>
@@ -109,11 +130,22 @@ export function Shows() {
   )
 }
 
-function statusLine(show: Show, next: Episode | undefined, now: Date) {
-  if (next) return `Next: ${episodeLabel([next])} · ${formatShortDate(next, now)}`
-  if (isOngoing(show.status)) return 'Returning, no date yet'
-  if (show.status === 'Canceled') return 'Cancelled'
-  return show.status || 'No episodes scheduled'
+function emptyMessage(filter: Filter, hidden: number) {
+  if (hidden > 0) return "You're caught up on everything here. Untick Hide caught up to see them."
+  if (filter === 'owned') return 'Nothing marked as owned yet. Open a show and tick Own on DVD or Own on streaming.'
+  if (filter === 'notStarted') return "You've started everything you follow."
+  return "You're not following anything. Follow shows from Search to see them here."
+}
+
+/** Where you're up to, plus what's next on the schedule (or TMDB's news if nothing is). */
+function statusLine(show: Show, p: Progress, nextUp: Episode | undefined, now: Date) {
+  const scheduled = nextUp && `${episodeLabel([nextUp])} ${formatShortDate(nextUp, now)}`
+  if (!p.started) {
+    if (p.aired > 0) return `Not started · ${p.aired} episode${p.aired === 1 ? '' : 's'}`
+    return scheduled ? `Not started · starts ${scheduled}` : `Not started · ${nextSeasonNote(show)}`
+  }
+  if (p.next) return `Up next: ${episodeLabel([p.next])} · ${p.left} left`
+  return scheduled ? `Caught up · next ${scheduled}` : `Caught up · ${nextSeasonNote(show)}`
 }
 
 function ownedLine(show: Show) {

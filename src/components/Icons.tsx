@@ -60,6 +60,12 @@ export const BackIcon = (p: P) => (
   </Base>
 )
 
+export const ChevronIcon = (p: P) => (
+  <Base {...p}>
+    <path d="M9 5l7 7-7 7" />
+  </Base>
+)
+
 export const CloseIcon = (p: P) => (
   <Base {...p}>
     <path d="M6 6l12 12M18 6L6 18" />

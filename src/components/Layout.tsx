@@ -64,6 +64,36 @@ export function Overlay({ title, children, fallback = '/' }: { title?: string; c
   )
 }
 
+/** A row of filter chips, used under screen titles. */
+export function Chips<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { id: T; label: string; count?: number }[]
+  value: T
+  onChange: (id: T) => void
+}) {
+  return (
+    <div className="flex gap-2 overflow-x-auto px-5 pb-3">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          onClick={() => onChange(o.id)}
+          className={`h-8 shrink-0 rounded-full px-3.5 text-sm font-medium transition ${
+            value === o.id
+              ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+              : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
+          }`}
+        >
+          {o.label}
+          {o.count ? <span className="ml-1 opacity-60">{o.count}</span> : null}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function Toast() {
   const message = toastStore.use()
   if (!message) return null

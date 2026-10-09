@@ -1,18 +1,25 @@
-import { db, setMeta, type Bucket, type Episode, type Ranking, type Show } from '../db'
+import { db, episodeKey, setMeta, type Bucket, type Episode, type Ranking, type Show, type Watched } from '../db'
 import { scoreFor } from './ranking'
 
 export interface BackupFile {
   app: 'show-tracker'
-  version: 1
+  /** 1 = before watched episodes existed; still accepted on import. */
+  version: 2
   exported_at: string
   shows: Show[]
   episodes: Episode[]
   rankings: Ranking[]
+  watched: Watched[]
 }
 
 export async function buildBackup(): Promise<File> {
-  const [shows, episodes, rankings] = await Promise.all([db.shows.toArray(), db.episodes.toArray(), db.rankings.toArray()])
-  const backup: BackupFile = { app: 'show-tracker', version: 1, exported_at: new Date().toISOString(), shows, episodes, rankings }
+  const [shows, episodes, rankings, watched] = await Promise.all([
+    db.shows.toArray(),
+    db.episodes.toArray(),
+    db.rankings.toArray(),
+    db.watched.toArray(),
+  ])
+  const backup: BackupFile = { app: 'show-tracker', version: 2, exported_at: new Date().toISOString(), shows, episodes, rankings, watched }
   const d = new Date()
   const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   return new File([JSON.stringify(backup, null, 2)], `show-tracker-backup-${stamp}.json`, { type: 'application/json' })
@@ -67,7 +74,7 @@ export function parseBackup(text: string): BackupFile {
     throw new Error("That file isn't valid JSON.")
   }
   if (!isObj(data) || data.app !== 'show-tracker') throw new Error("That doesn't look like a Show Tracker backup.")
-  if (data.version !== 1) throw new Error(`Unsupported backup version: ${String(data.version)}`)
+  if (data.version !== 1 && data.version !== 2) throw new Error(`Unsupported backup version: ${String(data.version)}`)
   if (!Array.isArray(data.shows) || !Array.isArray(data.episodes) || !Array.isArray(data.rankings)) {
     throw new Error('The backup is missing shows, episodes or rankings.')
   }
@@ -90,6 +97,14 @@ export function parseBackup(text: string): BackupFile {
       last_refreshed_at: strOrNull(s.last_refreshed_at),
       own_dvd: s.own_dvd === true,
       own_streaming: s.own_streaming === true,
+      // TMDB's next-season info; refreshed from TMDB anyway, so only kept if well-formed.
+      next_air:
+        isObj(s.next_air) && typeof s.next_air.date === 'string' && num(s.next_air.season) && num(s.next_air.number)
+          ? { date: s.next_air.date, season: s.next_air.season as number, number: s.next_air.number as number }
+          : null,
+      in_production: s.in_production === true,
+      latest_season: num(s.latest_season) ? (s.latest_season as number) : null,
+      last_aired_season: num(s.last_aired_season) ? (s.last_aired_season as number) : null,
     }
   })
   const showIds = new Set(shows.map((s) => s.tmdb_id))
@@ -123,7 +138,19 @@ export function parseBackup(text: string): BackupFile {
     }
   })
 
-  return { app: 'show-tracker', version: 1, exported_at: strOrNull(data.exported_at) ?? '', shows, episodes, rankings }
+  const watched: Watched[] = (Array.isArray(data.watched) ? data.watched : []).map((w, i) => {
+    if (!isObj(w) || !num(w.tmdb_show_id) || !num(w.season) || !num(w.number)) throw new Error(`Watched episode #${i + 1} is invalid.`)
+    const [showId, season, number] = [w.tmdb_show_id as number, w.season as number, w.number as number]
+    return {
+      id: episodeKey(showId, season, number),
+      tmdb_show_id: showId,
+      season,
+      number,
+      watched_at: typeof w.watched_at === 'string' ? w.watched_at : new Date().toISOString(),
+    }
+  })
+
+  return { app: 'show-tracker', version: 2, exported_at: strOrNull(data.exported_at) ?? '', shows, episodes, rankings, watched }
 }
 
 /** Positions are the source of truth; renumber them 0..n-1 per bucket and recompute scores. */
@@ -136,10 +163,11 @@ export function normalizeRankings(rankings: Ranking[]): Ranking[] {
 
 /** Replace everything on this device with the backup's contents. */
 export async function restoreBackup(backup: BackupFile) {
-  await db.transaction('rw', db.shows, db.episodes, db.rankings, async () => {
-    await Promise.all([db.shows.clear(), db.episodes.clear(), db.rankings.clear()])
+  await db.transaction('rw', [db.shows, db.episodes, db.rankings, db.watched], async () => {
+    await Promise.all([db.shows.clear(), db.episodes.clear(), db.rankings.clear(), db.watched.clear()])
     await db.shows.bulkPut(backup.shows)
     await db.episodes.bulkPut(backup.episodes)
     await db.rankings.bulkPut(normalizeRankings(backup.rankings))
+    await db.watched.bulkPut(backup.watched)
   })
 }

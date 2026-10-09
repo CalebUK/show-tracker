@@ -18,6 +18,15 @@ describe('parseBackup', () => {
     expect(b.episodes[0].airstamp).toBe('2026-10-10T01:00:00.000Z')
   })
 
+  it('reads watched episodes from version 2 and treats version 1 as having none', () => {
+    expect(parseBackup(JSON.stringify(valid)).watched).toEqual([])
+    const b = parseBackup(
+      JSON.stringify({ ...valid, version: 2, watched: [{ tmdb_show_id: 1, season: 2, number: 3, watched_at: '2026-10-01T00:00:00Z' }] }),
+    )
+    expect(b.watched).toEqual([{ id: '1:2:3', tmdb_show_id: 1, season: 2, number: 3, watched_at: '2026-10-01T00:00:00Z' }])
+    expect(() => parseBackup(JSON.stringify({ ...valid, version: 2, watched: [{ tmdb_show_id: 1 }] }))).toThrow(/Watched episode #1/)
+  })
+
   it('rejects things that are not backups', () => {
     expect(() => parseBackup('nope')).toThrow(/valid JSON/)
     expect(() => parseBackup('{"app":"other"}')).toThrow(/Show Tracker backup/)
