@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { episodeKey, type Episode, type Show, type Watched } from '../db'
-import { isFinished, nextSeasonNote, progressFor } from './progress'
+import { isFinished, isInProduction, nextSeasonNote, progressFor } from './progress'
 
 const now = new Date('2026-10-09T12:00:00Z')
 let id = 1
@@ -37,6 +37,12 @@ describe('progressFor', () => {
     expect(p.next?.name).toBe('S2E1')
   })
 
+  it('counts from the furthest ticked episode, ignoring skipped ones before it', () => {
+    // Watching live: only S2E1 ticked. Season 1 shouldn't come back as "next".
+    const p = progressFor(episodes, [seen(2, 1)], now)
+    expect(p).toMatchObject({ watched: 1, left: 0, next: null, caughtUp: true })
+  })
+
   it('is caught up when every aired episode is ticked, even with future ones scheduled', () => {
     const p = progressFor(episodes, [seen(1, 1), seen(1, 2), seen(2, 1)], now)
     expect(p).toMatchObject({ left: 0, next: null, caughtUp: true })
@@ -67,6 +73,19 @@ describe('isFinished', () => {
     expect(isFinished({ ...base, status: 'Canceled' }, caughtUp)).toBe(true)
     expect(isFinished({ ...base, status: 'Ended' }, behind)).toBe(false)
     expect(isFinished(base, caughtUp)).toBe(false)
+  })
+})
+
+describe('isInProduction', () => {
+  it('is true when TMDB says so, or a new season is listed', () => {
+    expect(isInProduction({ ...base, in_production: true })).toBe(true)
+    expect(isInProduction({ ...base, status: 'Planned' })).toBe(true)
+    expect(isInProduction({ ...base, latest_season: 3, last_aired_season: 2 })).toBe(true)
+    expect(isInProduction(base)).toBe(false)
+  })
+
+  it('is never true for an ended show', () => {
+    expect(isInProduction({ ...base, status: 'Ended', in_production: true })).toBe(false)
   })
 })
 

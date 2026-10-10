@@ -19,10 +19,10 @@ function Base(props: P) {
   )
 }
 
-export const CalendarIcon = (p: P) => (
+export const PlayIcon = (p: P) => (
   <Base {...p}>
-    <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
-    <path d="M3.5 10h17M8 3v4M16 3v4" />
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M10.2 8.8v6.4l5-3.2z" fill="currentColor" strokeWidth={1.2} />
   </Base>
 )
 

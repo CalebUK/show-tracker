@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { BackIcon, CalendarIcon, RankIcon, SearchIcon, SettingsIcon, TvIcon } from './Icons'
+import { BackIcon, PlayIcon, RankIcon, SearchIcon, SettingsIcon, TvIcon } from './Icons'
 import { goBack, navigate, type Tab } from '../lib/router'
 import { toastStore } from '../lib/toast'
 import { isIOS, isStandalone } from '../lib/install'
@@ -17,8 +17,8 @@ export function ScreenHeader({ title, right, children }: { title: string; right?
   )
 }
 
-const TABS: { id: Tab; label: string; path: string; Icon: typeof CalendarIcon }[] = [
-  { id: 'upcoming', label: 'Upcoming', path: '/', Icon: CalendarIcon },
+const TABS: { id: Tab; label: string; path: string; Icon: typeof TvIcon }[] = [
+  { id: 'watching', label: 'Watching', path: '/', Icon: PlayIcon },
   { id: 'shows', label: 'Shows', path: '/shows', Icon: TvIcon },
   { id: 'rankings', label: 'Rankings', path: '/rankings', Icon: RankIcon },
   { id: 'search', label: 'Search', path: '/search', Icon: SearchIcon },

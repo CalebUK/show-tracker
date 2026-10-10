@@ -6,7 +6,11 @@ export function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
 }
 
-/** A row in the Upcoming list. Episodes of one show released together (a binge drop) share a row. */
+export function addMonths(d: Date, months: number) {
+  return new Date(d.getFullYear(), d.getMonth() + months, d.getDate())
+}
+
+/** A row in the On air schedule. Episodes of one show released together (a binge drop) share a row. */
 export interface UpcomingRow {
   key: string
   show: Show
