@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type Episode } from '../db'
+import { db, type Episode, type Show } from '../db'
 import { getShowDetails, logoUrl, regionName, useRegion, type ShowDetails } from '../lib/tmdb'
-import { follow, setOwned, unfollow } from '../lib/shows'
+import { follow, setOwned, setStopped, unfollow } from '../lib/shows'
 import { BUCKETS, removeRanking, sortRankings } from '../lib/ranking'
 import { episodeLabel, formatAirTime, formatDateOnly } from '../lib/dates'
 import { navigate } from '../lib/router'
@@ -10,8 +10,8 @@ import { errorMessage, toast } from '../lib/toast'
 import { Button, Overlay, Switch } from '../components/Layout'
 import { Poster } from '../components/Poster'
 import { EpisodeList } from '../components/EpisodeList'
-import { isAired, nextSeasonNote } from '../lib/progress'
-import { setWatched } from '../lib/watched'
+import { isFinished, nextSeasonNote, progressFor, type Progress } from '../lib/progress'
+import { followAndWatchAll } from '../lib/watched'
 import { CheckIcon, ExternalIcon, PlusIcon, Spinner } from '../components/Icons'
 
 /** Subscription services come first, so the first few are the useful ones. */
@@ -31,6 +31,14 @@ export function ShowDetail({ id }: { id: number }) {
     const nowIso = new Date().toISOString()
     const eps = await db.episodes.where('tmdb_show_id').equals(id).sortBy('airstamp')
     return eps.find((e) => e.airstamp >= nowIso) ?? null
+  }, [id])
+  // Where you're up to, for the pill under the title. null when there's no episode list.
+  const progress = useLiveQuery(async () => {
+    const [episodes, watched] = await Promise.all([
+      db.episodes.where('tmdb_show_id').equals(id).toArray(),
+      db.watched.where('tmdb_show_id').equals(id).toArray(),
+    ])
+    return episodes.length ? progressFor(episodes, watched) : null
   }, [id])
 
   // Shows that aren't followed have no TVmaze data, so lean on TMDB for a preview.
@@ -89,19 +97,21 @@ export function ShowDetail({ id }: { id: number }) {
   const watchAll = async () => {
     setBusy(true)
     try {
-      await follow(id)
-      const now = new Date()
-      const aired = (await db.episodes.where('tmdb_show_id').equals(id).toArray()).filter((e) => isAired(e, now))
-      if (!aired.length) {
-        toast(`Following ${show.name}, but there's no episode list to tick yet`)
-        return
-      }
-      await setWatched(aired, true)
-      toast(`Watched all ${aired.length} episodes of ${show.name}`)
+      const ticked = await followAndWatchAll(id)
+      toast(ticked ? `Watched all ${ticked} episodes of ${show.name}` : `Following ${show.name}, but there's no episode list to tick yet`)
     } catch (err) {
       toast(errorMessage(err))
     } finally {
       setBusy(false)
+    }
+  }
+
+  const toggleStopped = async (value: boolean) => {
+    try {
+      await setStopped(id, value)
+      toast(value ? `${show.name} is hidden from Watching` : `${show.name} is back on Watching`)
+    } catch (err) {
+      toast(errorMessage(err))
     }
   }
 
@@ -136,6 +146,14 @@ export function ShowDetail({ id }: { id: number }) {
             )}
           </div>
         </div>
+
+        {stored?.followed && progress && (
+          <ProgressPill
+            show={stored}
+            progress={progress}
+            onClick={() => document.getElementById('episodes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          />
+        )}
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <Button variant={show.followed ? 'secondary' : 'primary'} onClick={toggleFollow} disabled={busy}>
@@ -197,10 +215,20 @@ export function ShowDetail({ id }: { id: number }) {
           </div>
         </section>
 
+        {stored?.followed && (
+          <section className="mt-7">
+            <h2 className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Tracking</h2>
+            <div className="mt-2">
+              <OwnToggle label="Stopped watching" checked={stored.stopped === true} onChange={toggleStopped} />
+            </div>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">Keeps it in Shows and Rankings, but hides it from Watching.</p>
+          </section>
+        )}
+
         {stored?.followed ? (
           <EpisodeList show={stored} />
         ) : (
-          <section className="mt-8">
+          <section id="episodes" className="mt-8">
             <h2 className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Episodes</h2>
             <div className="mt-3 flex items-center justify-between gap-4 py-1">
               <span className="text-[15px]">Watched all episodes</span>
@@ -290,5 +318,35 @@ function OwnToggle({ label, checked, onChange }: { label: string; checked: boole
         className="h-5 w-5 cursor-pointer accent-accent"
       />
     </label>
+  )
+}
+
+/** A quick "where am I" under the title; tapping it jumps to the episode list. */
+function ProgressPill({ show, progress, onClick }: { show: Show; progress: Progress; onClick: () => void }) {
+  let text: string
+  let done = false
+  if (show.stopped) text = 'Stopped watching'
+  else if (isFinished(show, progress)) {
+    text = 'Finished'
+    done = true
+  } else if (progress.caughtUp) {
+    text = 'Caught up'
+    done = true
+  } else if (progress.started) text = `${progress.left} episode${progress.left === 1 ? '' : 's'} left`
+  else if (progress.aired > 0) text = `Not started · ${progress.aired} episode${progress.aired === 1 ? '' : 's'}`
+  else return null
+
+  return (
+    <button
+      onClick={onClick}
+      className={`mt-5 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition active:opacity-70 ${
+        show.stopped
+          ? 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'
+          : 'bg-accent/10 text-accent-text dark:bg-accent/20'
+      }`}
+    >
+      {done && <CheckIcon width={16} height={16} />}
+      {text}
+    </button>
   )
 }

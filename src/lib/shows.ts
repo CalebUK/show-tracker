@@ -24,6 +24,8 @@ export async function follow(tmdbId: number) {
     ...details.show,
     followed: true,
     followed_at: new Date().toISOString(),
+    // Following again means tracking again.
+    stopped: false,
   })
   await refreshShow(tmdbId, details)
 }
@@ -37,6 +39,11 @@ export async function unfollow(tmdbId: number) {
     if (isOwned(show) || (await db.rankings.get(tmdbId))) await db.shows.update(tmdbId, { followed: false, followed_at: null })
     else await db.shows.delete(tmdbId)
   })
+}
+
+/** "Stopped watching": keep following (Shows, Rankings) but hide the show from Watching. */
+export async function setStopped(tmdbId: number, stopped: boolean) {
+  await db.shows.update(tmdbId, { stopped })
 }
 
 /** Tick or untick "Own on DVD" / "Own on streaming". Saves the show if it isn't stored yet. */

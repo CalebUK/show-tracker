@@ -47,7 +47,7 @@ export function Shows() {
   const lists = library && {
     // Finished shows (ended and fully watched) move out of the main list into their own.
     following: library.followed.filter((s) => !finished(s)),
-    notStarted: library.followed.filter((s) => !progress(s).started),
+    notStarted: library.followed.filter((s) => !s.stopped && !progress(s).started),
     finished: library.followed.filter(finished),
   }
   const hasAny = (library?.followed.length ?? 0) > 0
@@ -144,6 +144,7 @@ function emptyMessage(filter: Filter, hidden: number, finishedCount: number) {
 
 /** Where you're up to, plus what's next on the schedule (or TMDB's news if nothing is). */
 function statusLine(show: Show, p: Progress, nextUp: Episode | undefined, now: Date) {
+  if (show.stopped) return 'Stopped watching'
   const scheduled = nextUp && `${episodeLabel([nextUp])} ${formatShortDate(nextUp, now)}`
   if (!p.started) {
     if (p.aired > 0) return `Not started · ${p.aired} episode${p.aired === 1 ? '' : 's'}`

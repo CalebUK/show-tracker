@@ -97,6 +97,7 @@ export function parseBackup(text: string): BackupFile {
       last_refreshed_at: strOrNull(s.last_refreshed_at),
       own_dvd: s.own_dvd === true,
       own_streaming: s.own_streaming === true,
+      stopped: s.stopped === true,
       // TMDB's next-season info; refreshed from TMDB anyway, so only kept if well-formed.
       next_air:
         isObj(s.next_air) && typeof s.next_air.date === 'string' && num(s.next_air.season) && num(s.next_air.number)

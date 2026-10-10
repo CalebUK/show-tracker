@@ -110,6 +110,23 @@ export function IosInstallNote({ className = '' }: { className?: string }) {
   )
 }
 
+/** A pop-up that slides up from the bottom. Tapping outside it closes it. */
+export function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40" onClick={onClose} role="presentation">
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="pb-safe animate-slide-in w-full max-w-xl rounded-t-2xl bg-white px-5 pt-5 dark:bg-neutral-900"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="pb-5">{children}</div>
+      </div>
+    </div>
+  )
+}
+
 /** An on/off switch, styled like the native ones on iOS and Android. */
 export function Switch({
   checked,

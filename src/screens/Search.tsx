@@ -3,10 +3,11 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { searchShows, useTmdbKey, type SearchResult } from '../lib/tmdb'
 import { follow } from '../lib/shows'
+import { followAndWatchAll } from '../lib/watched'
 import { navigate } from '../lib/router'
 import { errorMessage, toast } from '../lib/toast'
 import { useOnline } from '../hooks/useOnline'
-import { IosInstallNote, ScreenHeader } from '../components/Layout'
+import { IosInstallNote, ScreenHeader, Sheet } from '../components/Layout'
 import { TmdbKeyForm, TmdbKeyHelp } from '../components/TmdbKeyForm'
 import { Poster } from '../components/Poster'
 import { CheckIcon, CloseIcon, PlusIcon, SearchIcon, Spinner } from '../components/Icons'
@@ -117,19 +118,35 @@ export function Search() {
 }
 
 function ResultRow({ result, followed, score }: { result: SearchResult; followed: boolean; score: number | undefined }) {
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<'track' | 'watched' | null>(null)
+  const [choosing, setChoosing] = useState(false)
   const year = result.first_air_date?.slice(0, 4)
 
-  const onFollow = async () => {
-    if (followed) return navigate(`/show/${result.id}`)
-    setBusy(true)
+  const startTracking = async () => {
+    setBusy('track')
     try {
       await follow(result.id)
-      toast(`Following ${result.name}`)
+      setChoosing(false)
+      toast(`Tracking ${result.name}`)
     } catch (err) {
       toast(errorMessage(err))
     } finally {
-      setBusy(false)
+      setBusy(null)
+    }
+  }
+
+  /** Follow it, tick every episode, then go straight into rating it. */
+  const watchedItAll = async () => {
+    setBusy('watched')
+    try {
+      const ticked = await followAndWatchAll(result.id)
+      setChoosing(false)
+      toast(ticked ? `Ticked all ${ticked} episodes. Now rate it` : `Following ${result.name}. Now rate it`)
+      navigate(`/rank/${result.id}`)
+    } catch (err) {
+      toast(errorMessage(err))
+    } finally {
+      setBusy(null)
     }
   }
 
@@ -144,20 +161,78 @@ function ResultRow({ result, followed, score }: { result: SearchResult; followed
           </div>
         </div>
       </button>
-      <button onClick={() => navigate(`/rank/${result.id}`)} className="h-9 shrink-0 rounded-full px-3 text-sm font-medium text-accent-text">
-        {score != null ? 'Re-rank' : 'Rank'}
-      </button>
       <button
-        onClick={onFollow}
-        disabled={busy}
-        aria-label={followed ? 'Following' : 'Follow'}
+        onClick={() => (followed ? navigate(`/show/${result.id}`) : setChoosing(true))}
+        aria-label={followed ? 'Following' : `Add ${result.name}`}
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition ${
           followed ? 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400' : 'bg-accent text-white'
         }`}
       >
-        {busy ? <Spinner className="h-4 w-4" /> : followed ? <CheckIcon width={18} height={18} /> : <PlusIcon width={18} height={18} />}
+        {followed ? <CheckIcon width={18} height={18} /> : <PlusIcon width={18} height={18} />}
       </button>
+
+      <Sheet open={choosing} onClose={() => !busy && setChoosing(false)}>
+        <div className="flex items-center gap-4">
+          <Poster path={result.poster_path} name={result.name} size="sm" />
+          <div className="min-w-0">
+            <div className="truncate text-[17px] font-semibold">{result.name}</div>
+            {year && <div className="text-sm text-neutral-500 dark:text-neutral-400">{year}</div>}
+          </div>
+        </div>
+        <div className="mt-5 flex flex-col gap-3">
+          <SheetOption
+            title="Start tracking"
+            body="Follow it and see new episodes on Watching."
+            onClick={startTracking}
+            busy={busy === 'track'}
+            disabled={busy != null}
+            primary
+          />
+          <SheetOption
+            title="Watched it all"
+            body="Tick every episode, then rate it."
+            onClick={watchedItAll}
+            busy={busy === 'watched'}
+            disabled={busy != null}
+          />
+          <button onClick={() => setChoosing(false)} disabled={busy != null} className="h-11 text-[15px] text-neutral-500 dark:text-neutral-400">
+            Cancel
+          </button>
+        </div>
+      </Sheet>
     </li>
+  )
+}
+
+function SheetOption({
+  title,
+  body,
+  onClick,
+  busy,
+  disabled,
+  primary = false,
+}: {
+  title: string
+  body: string
+  onClick: () => void
+  busy: boolean
+  disabled: boolean
+  primary?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex min-h-16 items-center gap-3 rounded-xl px-4 py-3 text-left transition active:opacity-80 disabled:opacity-60 ${
+        primary ? 'bg-accent text-white' : 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100'
+      }`}
+    >
+      <span className="flex-1">
+        <span className="block text-[15px] font-semibold">{title}</span>
+        <span className={`block text-sm ${primary ? 'text-white/80' : 'text-neutral-500 dark:text-neutral-400'}`}>{body}</span>
+      </span>
+      {busy && <Spinner className="h-5 w-5" />}
+    </button>
   )
 }
 

@@ -1,4 +1,18 @@
 import { db, episodeKey, type Episode } from '../db'
+import { isAired } from './progress'
+import { follow } from './shows'
+
+/**
+ * "Watched it all": follow the show (that's what loads its episode list) and tick every aired
+ * episode. Returns how many were ticked; 0 means there was no episode list to tick.
+ */
+export async function followAndWatchAll(tmdbId: number) {
+  await follow(tmdbId)
+  const now = new Date()
+  const aired = (await db.episodes.where('tmdb_show_id').equals(tmdbId).toArray()).filter((e) => isAired(e, now))
+  await setWatched(aired, true)
+  return aired.length
+}
 
 type EpisodeRef = Pick<Episode, 'tmdb_show_id' | 'season' | 'number'>
 

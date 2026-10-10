@@ -43,7 +43,9 @@ export function Watching() {
 
   const data = useMemo(() => {
     if (!library) return null
-    const { followed, upcoming, progress } = library
+    const { upcoming, progress } = library
+    // Shows marked "Stopped watching" stay followed but never appear here.
+    const followed = library.followed.filter((s) => !s.stopped)
     const p = (s: Show) => progress.get(s.tmdb_id)!
     const todayIso = startOfDay(now).toISOString()
     const soonIso = addMonths(startOfDay(now), SOON_MONTHS).toISOString()

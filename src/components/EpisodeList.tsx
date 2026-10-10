@@ -179,7 +179,7 @@ export function EpisodeList({ show }: { show: Show }) {
 
 function Section({ title, right, children }: { title: string; right?: string; children: React.ReactNode }) {
   return (
-    <section className="mt-8">
+    <section id="episodes" className="mt-8 scroll-mt-16">
       <div className="flex items-baseline justify-between gap-4">
         <h2 className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">{title}</h2>
         {right && <span className="text-sm text-neutral-500 tabular-nums dark:text-neutral-400">{right}</span>}

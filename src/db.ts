@@ -25,6 +25,8 @@ export interface Show {
   /** Ticked by the user on the show page. Optional so records saved before these existed still load. */
   own_dvd?: boolean
   own_streaming?: boolean
+  /** "Stopped watching": still followed (stays in Shows and Rankings) but hidden from Watching. */
+  stopped?: boolean
   /** From TMDB: the next announced episode (often a season premiere), if there is one. */
   next_air?: { date: string; season: number; number: number } | null
   in_production?: boolean
