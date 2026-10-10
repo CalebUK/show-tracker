@@ -168,6 +168,7 @@ export function Watching() {
                         key={show.tmdb_id}
                         show={show}
                         detail={`${episodeLabel([ep])} · ${formatAirTime(ep, 'later')}`}
+                        progress={progress(show)}
                       />
                     )
                   })}
@@ -176,7 +177,7 @@ export function Watching() {
               {data.undated.length > 0 && (
                 <Collapsible title="Still Cooking" subtitle="In production, no date yet" count={data.undated.length}>
                   {data.undated.map((show) => (
-                    <QuietRow key={show.tmdb_id} show={show} detail={nextSeasonNote(show)} />
+                    <QuietRow key={show.tmdb_id} show={show} detail={nextSeasonNote(show)} progress={progress(show)} />
                   ))}
                 </Collapsible>
               )}
@@ -246,7 +247,20 @@ function Collapsible({ title, subtitle, count, children }: { title: string; subt
 }
 
 /** Small poster, name and one line of detail; taps through to the show. */
-function QuietRow({ show, detail, padded = false }: { show: Show; detail: string; padded?: boolean }) {
+function QuietRow({
+  show,
+  detail,
+  progress,
+  padded = false,
+}: {
+  show: Show
+  detail: string
+  /** When given, adds a line saying how far behind you are. */
+  progress?: Progress
+  padded?: boolean
+}) {
+  const behind = progress?.started && progress.left > 0
+  const catchUp = progress && catchUpLine(progress)
   return (
     <li className="list-none">
       <button
@@ -257,10 +271,19 @@ function QuietRow({ show, detail, padded = false }: { show: Show; detail: string
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15px] text-neutral-700 dark:text-neutral-200">{show.name}</div>
           <div className="truncate text-sm text-neutral-500 tabular-nums dark:text-neutral-400">{detail}</div>
+          {catchUp && (
+            <div className={`text-xs tabular-nums ${behind ? 'font-medium text-accent-text' : 'text-neutral-400'}`}>{catchUp}</div>
+          )}
         </div>
       </button>
     </li>
   )
+}
+
+/** "12 to catch up", "Caught up", or "Not started · 30 episodes". */
+function catchUpLine(p: Progress) {
+  if (!p.started) return p.aired > 0 ? `Not started · ${p.aired} episode${p.aired === 1 ? '' : 's'}` : null
+  return p.left > 0 ? `${p.left} to catch up` : 'Caught up'
 }
 
 function Notice({ children }: { children: ReactNode }) {
