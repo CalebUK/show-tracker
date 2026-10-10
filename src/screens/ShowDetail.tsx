@@ -131,38 +131,44 @@ export function ShowDetail({ id }: { id: number }) {
   return (
     <Overlay>
       <div className="px-5 pt-2 pb-10">
-        <div className="flex gap-5">
+        {/* Everything at a glance beside the poster: title, details, score, progress and the main actions. */}
+        <div className="flex gap-4">
           <Poster path={show.poster_path} name={show.name} size="lg" />
-          <div className="min-w-0 flex-1 pt-1">
+          <div className="min-w-0 flex-1">
             <h1 className="text-2xl leading-tight font-semibold tracking-tight">{show.name}</h1>
-            {meta && <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">{meta}</p>}
+            {meta && <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{meta}</p>}
             {ranking && (
-              <div className="mt-4 flex items-baseline gap-2">
+              <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
                 <span className="text-3xl font-semibold text-accent-text tabular-nums">{ranking.score.toFixed(1)}</span>
                 <span className="text-sm text-neutral-500 dark:text-neutral-400">
                   {bucketLabel}{bucketRank ? ` · #${bucketRank.place} of ${bucketRank.count}` : ''}
                 </span>
               </div>
             )}
+            {/* Progress, Rank, Following: stacked, all the same width. */}
+            <div className="mt-3 flex flex-col gap-2">
+              {stored?.followed && progress && (
+                <ProgressPill
+                  show={stored}
+                  progress={progress}
+                  onClick={() => document.getElementById('episodes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                />
+              )}
+              <Button size="sm" variant="secondary" onClick={() => navigate(`/rank/${id}`)} className="w-full">
+                {ranking ? 'Re-rank' : 'Rank'}
+              </Button>
+              <Button size="sm" variant={show.followed ? 'secondary' : 'primary'} onClick={toggleFollow} disabled={busy} className="w-full">
+                {busy ? (
+                  <Spinner className="h-4 w-4" />
+                ) : show.followed ? (
+                  <CheckIcon width={16} height={16} />
+                ) : (
+                  <PlusIcon width={16} height={16} />
+                )}
+                {show.followed ? 'Following' : 'Follow'}
+              </Button>
+            </div>
           </div>
-        </div>
-
-        {stored?.followed && progress && (
-          <ProgressPill
-            show={stored}
-            progress={progress}
-            onClick={() => document.getElementById('episodes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          />
-        )}
-
-        <div className="mt-6 grid grid-cols-2 gap-3">
-          <Button variant={show.followed ? 'secondary' : 'primary'} onClick={toggleFollow} disabled={busy}>
-            {busy ? <Spinner /> : show.followed ? <CheckIcon width={18} height={18} /> : <PlusIcon width={18} height={18} />}
-            {show.followed ? 'Following' : 'Follow'}
-          </Button>
-          <Button variant="secondary" onClick={() => navigate(`/rank/${id}`)}>
-            {ranking ? 'Re-rank' : 'Rank'}
-          </Button>
         </div>
 
         <NextEpisode
@@ -339,7 +345,7 @@ function ProgressPill({ show, progress, onClick }: { show: Show; progress: Progr
   return (
     <button
       onClick={onClick}
-      className={`mt-5 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition active:opacity-70 ${
+      className={`flex h-9 w-full items-center justify-center gap-1.5 rounded-full px-3 text-sm font-medium transition active:opacity-70 ${
         show.stopped
           ? 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'
           : 'bg-accent/10 text-accent-text dark:bg-accent/20'

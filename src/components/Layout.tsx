@@ -185,6 +185,7 @@ export function Button({
   onClick,
   variant = 'primary',
   type = 'button',
+  size = 'md',
   disabled,
   className = '',
 }: {
@@ -192,6 +193,8 @@ export function Button({
   onClick?: () => void
   variant?: 'primary' | 'secondary' | 'ghost'
   type?: 'button' | 'submit'
+  /** `sm` is a smaller pill shape for tight spots, like beside a poster. */
+  size?: 'md' | 'sm'
   disabled?: boolean
   className?: string
 }) {
@@ -200,12 +203,13 @@ export function Button({
     secondary: 'bg-neutral-100 text-neutral-900 active:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:active:bg-neutral-700',
     ghost: 'text-accent-text active:opacity-60',
   }[variant]
+  const sizing = size === 'sm' ? 'h-9 gap-1.5 rounded-full px-3 text-sm' : 'h-11 gap-2 rounded-xl px-5 text-[15px]'
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-[15px] font-medium transition disabled:opacity-50 ${styles} ${className}`}
+      className={`inline-flex items-center justify-center font-medium transition disabled:opacity-50 ${sizing} ${styles} ${className}`}
     >
       {children}
     </button>
