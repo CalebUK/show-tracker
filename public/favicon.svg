@@ -1,8 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#4F46E5"/>
-  <g fill="none" stroke="#fff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="136" y="201" width="240" height="170" rx="28"/>
-    <path d="M206 141l50 52 50-52"/>
+  <!-- Full-bleed square: iOS and Android round the corners themselves. Everything sits inside
+       the maskable safe zone (a circle of radius 205 around the centre). -->
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="0" y1="512" x2="512" y2="0">
+      <stop offset="0" stop-color="#1d63b6"/>
+      <stop offset="0.55" stop-color="#3e45aa"/>
+      <stop offset="1" stop-color="#5f2ca6"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Ring with a gap at the top right, where the dot sits. -->
+  <path d="M335.3 124A154 154 0 1 0 382.2 167.7" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round"/>
+  <circle cx="361" cy="143.4" r="7" fill="#2dd4bf"/>
+  <!-- TV antenna that doubles as a tick: telescoping arms (thick, then thin) with ball tips, on a dome. -->
+  <g transform="translate(-4 4)" fill="#fff" stroke="#fff" stroke-linecap="round">
+    <path d="M232 298L208 270.5" stroke-width="11"/>
+    <path d="M208 270.5L186 245" stroke-width="5.5"/>
+    <circle cx="184" cy="243" r="8.5" stroke="none"/>
+    <path d="M254 298L297 240" stroke-width="11"/>
+    <path d="M297 240L338.5 184" stroke-width="5.5"/>
+    <circle cx="340" cy="182" r="8.5" stroke="none"/>
+    <path d="M218 320H268A4 4 0 0 0 272 316A29 26 0 0 0 214 316A4 4 0 0 0 218 320Z" stroke="none"/>
   </g>
-  <path d="M242 258v56l48-28z" fill="#fff"/>
 </svg>
