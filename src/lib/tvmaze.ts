@@ -39,6 +39,7 @@ interface TvmazeEpisode {
   name: string
   airtime: string
   airstamp: string | null
+  runtime: number | null
 }
 
 /** The full episode list (past and future), so past episodes can be ticked as watched. */
@@ -57,6 +58,7 @@ export async function getEpisodes(tvmazeId: number, tmdbShowId: number): Promise
       name: e.name,
       airstamp: new Date(t).toISOString(),
       has_time: Boolean(e.airtime),
+      runtime: e.runtime ?? null,
     })
   }
   return out

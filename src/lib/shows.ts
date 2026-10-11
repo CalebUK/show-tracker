@@ -1,5 +1,5 @@
-import { db, isOwned, type Show } from '../db'
-import { getShowDetails, getTmdbKey, type ShowDetails } from './tmdb'
+import { db, isOwned, type Episode, type Show } from '../db'
+import { getEpisodeRuntimes, getShowDetails, getTmdbKey, type ShowDetails } from './tmdb'
 import { getEpisodes, lookupTvmazeId, sleep } from './tvmaze'
 import { createStore } from './store'
 import { errorMessage } from './toast'
@@ -63,6 +63,7 @@ export async function refreshShow(tmdbId: number, prefetched?: ShowDetails) {
   const details = prefetched ?? (await getShowDetails(tmdbId, { fresh: true }))
   const tvmazeId = show.tvmaze_id ?? (await lookupTvmazeId(details.show.imdb_id, details.tvdb_id))
   const episodes = tvmazeId ? await getEpisodes(tvmazeId, tmdbId) : []
+  await addTmdbRuntimes(tmdbId, episodes)
 
   await db.transaction('rw', db.shows, db.episodes, async () => {
     const current = await db.shows.get(tmdbId)
@@ -106,4 +107,35 @@ export function refreshFollowed({ force = false } = {}): Promise<void> {
     if (refreshStore.get().running) refreshStore.set({ running: false, error: refreshStore.get().error })
   })
   return inFlight
+}
+
+/**
+ * Swap TVmaze's runtimes (often the TV slot, e.g. 60) for TMDB's real episode lengths (e.g. 43).
+ * Episodes already checked keep their runtime, so only seasons with newly aired episodes are fetched.
+ * Mutates `episodes`. If TMDB can't be reached, TVmaze's runtimes stay and it tries again next refresh.
+ */
+async function addTmdbRuntimes(tmdbId: number, episodes: Episode[]) {
+  const previous = new Map((await db.episodes.where('tmdb_show_id').equals(tmdbId).toArray()).map((e) => [`${e.season}:${e.number}`, e]))
+  const now = Date.now()
+  const seasons = new Set<number>()
+  for (const e of episodes) {
+    if (e.number == null || e.season < 1) continue
+    const before = previous.get(`${e.season}:${e.number}`)
+    if (before?.runtime_checked) {
+      e.runtime = before.runtime
+      e.runtime_checked = true
+    } else if (Date.parse(e.airstamp) <= now) seasons.add(e.season)
+  }
+  if (!seasons.size) return
+  try {
+    const runtimes = await getEpisodeRuntimes(tmdbId, [...seasons])
+    for (const e of episodes) {
+      if (e.number == null || !seasons.has(e.season) || e.runtime_checked) continue
+      e.runtime = runtimes.get(`${e.season}:${e.number}`) ?? e.runtime
+      // Only aired episodes count as checked; TMDB often fills in runtimes after an episode airs.
+      if (Date.parse(e.airstamp) <= now) e.runtime_checked = true
+    }
+  } catch {
+    // Keep TVmaze's runtimes for now.
+  }
 }

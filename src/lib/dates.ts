@@ -119,6 +119,16 @@ export function formatDateOnly(isoDate: string) {
   return date.getFullYear() === new Date().getFullYear() ? monthDay.format(date) : fullDate.format(date)
 }
 
+/** Compact duration: "45m", "5h 20m", "2d 4h". */
+export function formatDuration(totalMinutes: number) {
+  const minutes = Math.round(totalMinutes)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return minutes % 60 ? `${hours}h ${minutes % 60}m` : `${hours}h`
+  const days = Math.floor(hours / 24)
+  return hours % 24 ? `${days}d ${hours % 24}h` : `${days}d`
+}
+
 const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
 
 export function timeAgo(iso: string) {

@@ -224,6 +224,23 @@ function toDetails(d: TmdbDetails): ShowDetails {
   }
 }
 
+/**
+ * TMDB's per-episode runtimes, keyed "season:episode". These are the real lengths (Smallville 43),
+ * where TVmaze often gives the TV slot (60). Up to 20 seasons come back in one request.
+ */
+export async function getEpisodeRuntimes(tmdbId: number, seasons: number[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>()
+  for (let i = 0; i < seasons.length; i += 20) {
+    const batch = seasons.slice(i, i + 20)
+    const data = await get<Record<string, unknown>>(`/tv/${tmdbId}`, { append_to_response: batch.map((n) => `season/${n}`).join(',') })
+    for (const n of batch) {
+      const season = data[`season/${n}`] as { episodes?: { episode_number: number; runtime: number | null }[] } | undefined
+      for (const e of season?.episodes ?? []) if (e.runtime) out.set(`${n}:${e.episode_number}`, e.runtime)
+    }
+  }
+  return out
+}
+
 /** Statuses that mean more episodes are expected. */
 export function isOngoing(status: string) {
   return status === 'Returning Series' || status === 'In Production' || status === 'Planned' || status === 'Pilot'

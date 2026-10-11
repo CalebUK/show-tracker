@@ -122,6 +122,8 @@ export function parseBackup(text: string): BackupFile {
       name: typeof e.name === 'string' ? e.name : '',
       airstamp: new Date(e.airstamp).toISOString(),
       has_time: e.has_time !== false,
+      runtime: num(e.runtime) ? (e.runtime as number) : null,
+      runtime_checked: e.runtime_checked === true,
     }
   })
 

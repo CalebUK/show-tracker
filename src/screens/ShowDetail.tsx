@@ -209,15 +209,11 @@ export function ShowDetail({ id }: { id: number }) {
           )}
         </section>
 
-        <section className="mt-7">
-          <h2 className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Your copies</h2>
-          <div className="mt-2 divide-y divide-neutral-100 dark:divide-neutral-800">
-            <OwnToggle label="Own on DVD" checked={stored?.own_dvd === true} onChange={(v) => toggleOwned('own_dvd', v)} />
-            <OwnToggle
-              label="Own on streaming"
-              checked={stored?.own_streaming === true}
-              onChange={(v) => toggleOwned('own_streaming', v)}
-            />
+        <section className="mt-7 flex items-center justify-between gap-3">
+          <h2 className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Own it on</h2>
+          <div className="flex gap-2">
+            <ToggleChip label="DVD" pressed={stored?.own_dvd === true} onChange={(v) => toggleOwned('own_dvd', v)} />
+            <ToggleChip label="Streaming" pressed={stored?.own_streaming === true} onChange={(v) => toggleOwned('own_streaming', v)} />
           </div>
         </section>
 
@@ -353,6 +349,24 @@ function ProgressPill({ show, progress, onClick }: { show: Show; progress: Progr
     >
       {done && <CheckIcon width={16} height={16} />}
       {text}
+    </button>
+  )
+}
+
+/** A small on/off pill, used for "Own it on: DVD / Streaming". */
+function ToggleChip({ label, pressed, onChange }: { label: string; pressed: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <button
+      aria-pressed={pressed}
+      onClick={() => onChange(!pressed)}
+      className={`inline-flex h-8 items-center gap-1 rounded-full px-3 text-sm font-medium transition active:opacity-70 ${
+        pressed
+          ? 'bg-accent/10 text-accent-text dark:bg-accent/20'
+          : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
+      }`}
+    >
+      {pressed && <CheckIcon width={14} height={14} />}
+      {label}
     </button>
   )
 }

@@ -49,6 +49,10 @@ export interface Episode {
   airstamp: string
   /** False when TVmaze only knows the date, not the time. */
   has_time: boolean
+  /** Length in minutes: TMDB's where it has one, otherwise TVmaze's. Missing on episodes saved before this existed. */
+  runtime?: number | null
+  /** TMDB has been asked for this episode's runtime, so later refreshes don't ask again. */
+  runtime_checked?: boolean
 }
 
 /**
@@ -126,6 +130,19 @@ db.version(3)
         if (typeof r.rating !== 'number') r.rating = scoreToRating(r.score)
         if (typeof r.comparisons !== 'number') r.comparisons = 0
         delete r.position
+      }),
+  )
+
+db.version(4)
+  .stores({ shows: 'tmdb_id' })
+  .upgrade((tx) =>
+    // Episodes now carry their runtime (for "time watched"). Mark followed shows stale so the
+    // next refresh re-downloads their episode lists with it.
+    tx
+      .table('shows')
+      .toCollection()
+      .modify((s: Show) => {
+        if (s.followed) s.last_refreshed_at = null
       }),
   )
 

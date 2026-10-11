@@ -106,3 +106,23 @@ describe('nextSeasonNote', () => {
     expect(nextSeasonNote({ ...base, status: 'Canceled' })).toBe('Cancelled')
   })
 })
+
+describe('time watched', () => {
+  const timed = (season: number, number: number, runtime: number | null): Episode => ({ ...ep(season, number, -30), runtime })
+
+  it('adds up runtimes of ticked episodes, and of the ones still to watch', () => {
+    const eps = [timed(1, 1, 60), timed(1, 2, 55), timed(1, 3, 50)]
+    const p = progressFor(eps, [seen(1, 1)], now)
+    expect(p.minutesWatched).toBe(60)
+    expect(p.minutesLeft).toBe(105)
+  })
+
+  it("uses the show's average length for episodes with no runtime", () => {
+    const eps = [timed(1, 1, 60), timed(1, 2, null), timed(1, 3, 40)]
+    expect(progressFor(eps, [seen(1, 1), seen(1, 2)], now).minutesWatched).toBe(110)
+  })
+
+  it('is unknown when no episode has a runtime', () => {
+    expect(progressFor(episodes, [seen(1, 1)], now).minutesWatched).toBeNull()
+  })
+})

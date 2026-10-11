@@ -23,6 +23,10 @@ export interface Progress {
   /** Started, and every aired episode is ticked. */
   caughtUp: boolean
   lastWatchedAt: string | null
+  /** Total runtime of ticked episodes, in minutes. null when no runtimes are known. */
+  minutesWatched: number | null
+  /** Total runtime of the episodes still to watch (`left`), in minutes. */
+  minutesLeft: number | null
 }
 
 /**
@@ -40,6 +44,7 @@ export function progressFor(episodes: Episode[], watched: Watched[], now = new D
   })
   const remaining = aired.slice(furthest + 1)
   const started = watched.length > 0
+  const minutes = runtimeTotal(episodes)
   return {
     aired: aired.length,
     watched: aired.filter(isSeen).length,
@@ -48,7 +53,19 @@ export function progressFor(episodes: Episode[], watched: Watched[], now = new D
     started,
     caughtUp: started && remaining.length === 0,
     lastWatchedAt: watched.reduce<string | null>((max, w) => (!max || w.watched_at > max ? w.watched_at : max), null),
+    minutesWatched: minutes(aired.filter(isSeen)),
+    minutesLeft: minutes(remaining),
   }
+}
+
+/**
+ * Adds up episode runtimes. Episodes with no runtime count as the show's average episode
+ * length; if no episode of the show has a runtime, the total is unknown (null).
+ */
+function runtimeTotal(allEpisodes: Episode[]) {
+  const known = allEpisodes.map((e) => e.runtime).filter((r): r is number => typeof r === 'number' && r > 0)
+  const average = known.length ? known.reduce((a, b) => a + b, 0) / known.length : null
+  return (list: Episode[]) => (average == null ? null : Math.round(list.reduce((sum, e) => sum + (e.runtime || average), 0)))
 }
 
 const isOver = (show: Show) => show.status === 'Ended' || show.status === 'Canceled'

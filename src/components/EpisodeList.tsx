@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, episodeKey, type Episode, type Show } from '../db'
-import { formatAirTime } from '../lib/dates'
-import { byEpisodeOrder, isAired } from '../lib/progress'
+import { formatAirTime, formatDuration } from '../lib/dates'
+import { byEpisodeOrder, isAired, progressFor, type Progress } from '../lib/progress'
 import { clearWatched, setWatched } from '../lib/watched'
 import { errorMessage, toast } from '../lib/toast'
 import { useNow } from '../hooks/useNow'
@@ -17,7 +17,11 @@ export function EpisodeList({ show }: { show: Show }) {
       db.episodes.where('tmdb_show_id').equals(show.tmdb_id).toArray(),
       db.watched.where('tmdb_show_id').equals(show.tmdb_id).toArray(),
     ])
-    return { episodes: episodes.filter((e) => e.number != null).sort(byEpisodeOrder), watched: new Set(watched.map((w) => w.id)) }
+    return {
+      episodes: episodes.filter((e) => e.number != null).sort(byEpisodeOrder),
+      watched: new Set(watched.map((w) => w.id)),
+      progress: progressFor(episodes, watched),
+    }
   }, [show.tmdb_id])
   const [openSeasons, setOpenSeasons] = useState<Set<number> | null>(null)
   // After ticking an episode, offer to tick the unwatched ones before it too.
@@ -90,6 +94,7 @@ export function EpisodeList({ show }: { show: Show }) {
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
         <div className="h-full rounded-full bg-accent" style={{ width: `${aired.length ? (watchedCount / aired.length) * 100 : 0}%` }} />
       </div>
+      <TimeWatched progress={data.progress} />
 
       <div className="mt-3 flex items-center justify-between gap-4 py-1">
         <span className="text-[15px]">Watched all episodes</span>
@@ -186,5 +191,21 @@ function Section({ title, right, children }: { title: string; right?: string; ch
       </div>
       {children}
     </section>
+  )
+}
+
+/** "4d 6h watched · 14h to go", from episode runtimes. Hidden when runtimes are unknown. */
+function TimeWatched({ progress }: { progress: Progress }) {
+  if (progress.minutesWatched == null) return null
+  return (
+    <p className="mt-2 text-sm text-neutral-500 tabular-nums dark:text-neutral-400">
+      <span className="font-medium text-neutral-900 dark:text-neutral-100">{formatDuration(progress.minutesWatched)}</span> watched
+      {progress.minutesLeft ? (
+        <>
+          {' · '}
+          <span className="font-medium text-neutral-900 dark:text-neutral-100">{formatDuration(progress.minutesLeft)}</span> to go
+        </>
+      ) : null}
+    </p>
   )
 }

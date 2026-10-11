@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Episode, Show } from '../db'
-import { episodeLabel, formatShortDate, groupUpcoming } from './dates'
+import { episodeLabel, formatDuration, formatShortDate, groupUpcoming } from './dates'
 
 const show = (id: number): Show => ({
   tmdb_id: id,
@@ -71,5 +71,15 @@ describe('formatShortDate', () => {
     expect(formatShortDate({ airstamp: at(3).toISOString(), has_time: true }, now)).toBe(
       new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(at(3)),
     )
+  })
+})
+
+describe('formatDuration', () => {
+  it('uses the largest sensible units', () => {
+    expect(formatDuration(45)).toBe('45m')
+    expect(formatDuration(60)).toBe('1h')
+    expect(formatDuration(320)).toBe('5h 20m')
+    expect(formatDuration(24 * 60)).toBe('1d')
+    expect(formatDuration(52 * 60 + 10)).toBe('2d 4h')
   })
 })
