@@ -21,10 +21,10 @@ const SECTIONS: { id: keyof UpcomingGroups; title: string }[] = [
   { id: 'later', title: 'Later' },
 ]
 
-type View = 'on' | 'off'
+type View = 'on' | 'streaming'
 const VIEWS: { id: View; label: string }[] = [
   { id: 'on', label: 'On air' },
-  { id: 'off', label: 'Off air' },
+  { id: 'streaming', label: 'Streaming' },
 ]
 
 /** Further out than this, a show's next date goes in the "More than 3 months away" section. */
@@ -60,29 +60,34 @@ export function Watching() {
     const isFarAway = (s: Show) => !airingSoon.has(s.tmdb_id) && nextDate.has(s.tmdb_id)
     const isUndated = (s: Show) => !nextDate.has(s.tmdb_id) && isInProduction(s)
 
-    // Off air: nothing in the next 3 months, and not finished (those live under Shows → Finished).
-    const notAiring = followed.filter((s) => !airingSoon.has(s.tmdb_id))
-    const offAir = notAiring.filter((s) => !isFinished(s, p(s)))
-    // Shows listed in On air's far-away / in-production sections only appear in Off air if there's something to watch.
+    // Streaming: what you're working through at your own pace, airing or not (e.g. season 1 while
+    // season 2 airs). Finished shows live under Shows → Finished instead.
+    const active = followed.filter((s) => !isFinished(s, p(s)))
+    // An episode that aired today is already listed under On air → Today.
+    const nextAiredToday = (s: Show) => !!p(s).next && p(s).next!.airstamp >= todayIso
+    // Shows in On air's Save the Date / Still Cooking sections, or on the schedule.
     const hasNews = (s: Show) => isFarAway(s) || isUndated(s)
+    const upNext = active
+      .filter((s) => p(s).started && p(s).next && !nextAiredToday(s))
+      .sort((a, b) => (p(b).lastWatchedAt ?? '').localeCompare(p(a).lastWatchedAt ?? ''))
+    const notStarted = active.filter(
+      (s) => !p(s).started && (p(s).next ? !nextAiredToday(s) : !airingSoon.has(s.tmdb_id) && !hasNews(s)),
+    )
+    const caughtUp = active.filter((s) => p(s).caughtUp && !airingSoon.has(s.tmdb_id) && !hasNews(s))
 
     return {
-      // On air
-      catchUp: followed
-        .filter((s) => airingSoon.has(s.tmdb_id) && p(s).started && p(s).next && p(s).next!.airstamp < todayIso)
-        .sort((a, b) => (p(b).lastWatchedAt ?? '').localeCompare(p(a).lastWatchedAt ?? '')),
+      // On air: the schedule.
       groups: groupUpcoming(soon, new Map(followed.map((s) => [s.tmdb_id, s])), now),
       farAway: followed.filter(isFarAway).sort((a, b) => nextDate.get(a.tmdb_id)!.airstamp.localeCompare(nextDate.get(b.tmdb_id)!.airstamp)),
       undated: followed.filter(isUndated),
       nextDate,
-      // Off air
-      upNext: offAir
-        .filter((s) => p(s).started && p(s).next)
-        .sort((a, b) => (p(b).lastWatchedAt ?? '').localeCompare(p(a).lastWatchedAt ?? '')),
-      notStarted: offAir.filter((s) => !p(s).started && (p(s).next || !hasNews(s))),
-      caughtUp: offAir.filter((s) => p(s).caughtUp && !hasNews(s)),
-      offAirCount: offAir.length,
-      finishedCount: notAiring.length - offAir.length,
+      // Streaming
+      upNext,
+      notStarted,
+      caughtUp,
+      airingSoon,
+      streamingCount: upNext.length + notStarted.length + caughtUp.length,
+      finishedCount: followed.length - active.length,
     }
   }, [library, now])
 
@@ -102,8 +107,7 @@ export function Watching() {
 
   const hasShows = (library?.followed.length ?? 0) > 0
   const progress = (s: Show) => library!.progress.get(s.tmdb_id)!
-  const nothingOnAir =
-    data && !data.catchUp.length && !data.groups.today.length && !data.groups.week.length && !data.groups.later.length
+  const nothingOnAir = data && !data.groups.today.length && !data.groups.week.length && !data.groups.later.length
 
   return (
     <>
@@ -137,13 +141,6 @@ export function Watching() {
           />
         ) : !data ? null : view === 'on' ? (
           <div className="pb-6">
-            {data.catchUp.length > 0 && (
-              <Section title="Catch up">
-                {data.catchUp.map((show) => (
-                  <UpNextRow key={show.tmdb_id} show={show} progress={progress(show)} />
-                ))}
-              </Section>
-            )}
             {SECTIONS.map(({ id, title }) =>
               data.groups[id].length ? (
                 <Section key={id} title={title}>
@@ -156,7 +153,7 @@ export function Watching() {
             {nothingOnAir && (
               <Notice>
                 Nothing in the next {SOON_MONTHS} months for the shows you follow.
-                {data.offAirCount > 0 && ' Off air has your next episodes to watch.'}
+                {data.streamingCount > 0 && ' Streaming has your next episodes to watch.'}
               </Notice>
             )}
 
@@ -190,14 +187,14 @@ export function Watching() {
             {data.upNext.length > 0 && (
               <Section title="Up next">
                 {data.upNext.map((show) => (
-                  <UpNextRow key={show.tmdb_id} show={show} progress={progress(show)} />
+                  <UpNextRow key={show.tmdb_id} show={show} progress={progress(show)} airing={data.airingSoon.has(show.tmdb_id)} />
                 ))}
               </Section>
             )}
             {data.notStarted.length > 0 && (
               <Section title="Not started">
                 {data.notStarted.map((show) => (
-                  <UpNextRow key={show.tmdb_id} show={show} progress={progress(show)} />
+                  <UpNextRow key={show.tmdb_id} show={show} progress={progress(show)} airing={data.airingSoon.has(show.tmdb_id)} />
                 ))}
               </Section>
             )}
@@ -208,11 +205,11 @@ export function Watching() {
                 ))}
               </Section>
             )}
-            {data.offAirCount === 0 && (
+            {data.streamingCount === 0 && (
               <Notice>
                 {data.finishedCount > 0
                   ? "Nothing to catch up on. Shows you've finished are in the Shows tab under Finished."
-                  : 'Every show you follow has episodes on the schedule. Shows with nothing scheduled appear here with your next unwatched episode.'}
+                  : "Nothing to catch up on. Shows you're working through appear here with your next episode to watch."}
               </Notice>
             )}
           </div>
@@ -321,7 +318,7 @@ function EpisodeRow({ row, group, now }: { row: UpcomingRow; group: keyof Upcomi
 }
 
 /** Your next unwatched episode of a show, with a tick to mark it and move on. */
-function UpNextRow({ show, progress }: { show: Show; progress: Progress }) {
+function UpNextRow({ show, progress, airing = false }: { show: Show; progress: Progress; airing?: boolean }) {
   const ep = progress.next
   return (
     <li className="flex items-center gap-2 pr-4">
@@ -331,7 +328,14 @@ function UpNextRow({ show, progress }: { show: Show; progress: Progress }) {
       >
         <Poster path={show.poster_path} name={show.name} size="sm" />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[15px] font-medium">{show.name}</div>
+          <div className="flex items-center gap-2">
+            <span className="truncate text-[15px] font-medium">{show.name}</span>
+            {airing && (
+              <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent-text dark:bg-accent/20">
+                Still airing
+              </span>
+            )}
+          </div>
           <div className="truncate text-sm text-neutral-500 dark:text-neutral-400">
             {ep ? (
               <>
