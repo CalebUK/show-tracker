@@ -3,15 +3,16 @@
 /* Dark mode follows a `dark` class on <html>, set from Settings → Appearance (default: follow the system). */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* The one accent colour. `accent` is for fills, `accent-text` for text and links. */
+/* The one accent colour: the blue-violet from the middle of the logo's gradient.
+   `accent` is for fills (white text on it), `accent-text` for text and links. */
 :root {
-  --accent: #4f46e5;
-  --accent-text: #4f46e5;
+  --accent: #4a3cbc;
+  --accent-text: #4a3cbc;
   color-scheme: light;
 }
 :root.dark {
-  --accent: #6366f1;
-  --accent-text: #a5b4fc;
+  --accent: #6b5bd6;
+  --accent-text: #b4a9f5;
   color-scheme: dark;
 }
 

@@ -170,11 +170,12 @@ export function Settings() {
               Buy me a coffee
             </a>
           </div>
-          <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-            This product uses the TMDB API but is not endorsed or certified by TMDB.{' '}
-            <a className="text-accent-text" href="https://www.themoviedb.org/" target="_blank" rel="noreferrer">
-              themoviedb.org
-            </a>
+          {/* TMDB's terms require their logo, kept smaller than the app's own branding. */}
+          <a href="https://www.themoviedb.org/" target="_blank" rel="noreferrer" className="inline-block" aria-label="The Movie Database (TMDB)">
+            <img src={`${import.meta.env.BASE_URL}tmdb-logo.svg`} alt="TMDB" className="h-3.5 w-auto" />
+          </a>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+            This app uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.
           </p>
           <p className="mt-2 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
             Episode schedules from{' '}
