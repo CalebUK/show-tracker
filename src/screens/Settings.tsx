@@ -5,6 +5,7 @@ import { buildBackup, parseBackup, restoreBackup, saveFile, type BackupFile } fr
 import { installPrompt, isIOS, isStandalone } from '../lib/install'
 import { formatDuration, timeAgo } from '../lib/dates'
 import { useLibrary } from '../hooks/useLibrary'
+import { isFinished } from '../lib/progress'
 import { useNow } from '../hooks/useNow'
 import { refreshFollowed } from '../lib/shows'
 import { errorMessage, toast } from '../lib/toast'
@@ -194,15 +195,19 @@ function StatsSection() {
   if (!library) return null
   let episodes = 0
   let minutes = 0
-  for (const p of library.progress.values()) {
+  let finished = 0
+  for (const show of library.shows) {
+    const p = library.progress.get(show.tmdb_id)!
     episodes += p.watched
     minutes += p.minutesWatched ?? 0
+    if (isFinished(show, p)) finished++
   }
   return (
     <Section title="Your stats">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-2">
         <Stat value={episodes.toLocaleString()} label={episodes === 1 ? 'episode watched' : 'episodes watched'} />
         <Stat value={minutes ? formatDuration(minutes) : '0m'} label="time watched" />
+        <Stat value={finished.toLocaleString()} label={finished === 1 ? 'show finished' : 'shows finished'} />
       </div>
     </Section>
   )
@@ -210,9 +215,9 @@ function StatsSection() {
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-xl bg-neutral-50 px-4 py-3 dark:bg-neutral-900">
-      <div className="text-2xl font-semibold tracking-tight text-accent-text tabular-nums">{value}</div>
-      <div className="text-sm text-neutral-500 dark:text-neutral-400">{label}</div>
+    <div className="rounded-xl bg-neutral-50 px-3 py-3 dark:bg-neutral-900">
+      <div className="text-xl font-semibold tracking-tight whitespace-nowrap text-accent-text tabular-nums">{value}</div>
+      <div className="text-xs leading-snug text-neutral-500 dark:text-neutral-400">{label}</div>
     </div>
   )
 }

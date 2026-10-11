@@ -74,4 +74,4 @@ A few choices the spec left open:
 - The show page has a **progress pill** above Follow / Rank: "16 episodes left", "Caught up", "Finished", "Not started · 19 episodes" or "Stopped watching". Tapping it jumps to the episode list.
 - In **Search**, **+** opens a pop-up: **Start tracking** (follow it) or **Watched it all** (follow it, tick every aired episode, then go straight into rating it).
 - **Time watched** on a show's Episodes section adds up the runtimes of ticked episodes ("3d 5h watched · 3d 4h to go"). Runtimes come from TMDB where it has them (real lengths, e.g. 43 min), otherwise TVmaze (often the TV slot, e.g. 60). Each episode is looked up once; episodes with no runtime count as the show's average.
-- **Your stats** at the top of Settings adds up episodes watched and time watched across every show.
+- **Your stats** at the top of Settings adds up episodes watched, time watched and shows finished (ended and fully watched) across every show.
