@@ -189,7 +189,7 @@ export function ShowDetail({ id }: { id: number }) {
                 {(showAllStreaming ? streaming : streaming.slice(0, STREAMING_PREVIEW)).map((p) => (
                   <li key={p.id} className="flex items-center gap-2 rounded-full bg-neutral-100 py-1 pr-3 pl-1 text-sm dark:bg-neutral-800">
                     {p.logo_path ? (
-                      <img src={logoUrl(p.logo_path)!} alt="" className="h-6 w-6 rounded-full" loading="lazy" />
+                      <img src={logoUrl(p.logo_path)!} alt="" crossOrigin="anonymous" className="h-6 w-6 rounded-full" loading="lazy" />
                     ) : (
                       <span className="h-6 w-6" />
                     )}

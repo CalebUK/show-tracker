@@ -11,6 +11,7 @@ import { refreshFollowed } from '../lib/shows'
 import { errorMessage, toast } from '../lib/toast'
 import {
   DEV_KEY,
+  isReadAccessToken,
   detectedRegion,
   getStreamingRegions,
   regionName,
@@ -237,18 +238,24 @@ function TmdbKeySection() {
   const [editing, setEditing] = useState(false)
 
   const remove = async () => {
-    if (!window.confirm('Remove the TMDB key from this phone? Search and refresh will stop until you add one again.')) return
+    if (!window.confirm('Remove the TMDB token from this phone? Search and refresh will stop until you add one again.')) return
     await removeTmdbKey()
-    toast('TMDB key removed')
+    toast('TMDB token removed')
   }
 
   return (
-    <Section title="TMDB key">
+    <Section title="TMDB token">
       {stored && !editing ? (
         <>
           <p className="text-sm text-neutral-500 dark:text-neutral-400">
             Saved on this phone, ending in <span className="font-mono text-neutral-700 dark:text-neutral-300">{stored.slice(-4)}</span>.
           </p>
+          {!isReadAccessToken(stored) && (
+            <p className="mt-2 text-sm text-accent-text">
+              This is the older, shorter API Key. Tap Change and paste your API Read Access Token instead: it's sent more
+              privately.
+            </p>
+          )}
           <div className="mt-3 grid grid-cols-2 gap-3">
             <Button variant="secondary" onClick={() => setEditing(true)}>
               Change

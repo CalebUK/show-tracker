@@ -1,4 +1,4 @@
-import { db, isOwned, type Episode, type Show } from '../db'
+import { db, hasTicks, isOwned, type Episode, type Show } from '../db'
 import { getEpisodeRuntimes, getShowDetails, getTmdbKey, type ShowDetails } from './tmdb'
 import { getEpisodes, lookupTvmazeId, sleep } from './tvmaze'
 import { createStore } from './store'
@@ -31,12 +31,15 @@ export async function follow(tmdbId: number) {
 }
 
 export async function unfollow(tmdbId: number) {
-  await db.transaction('rw', db.shows, db.episodes, db.rankings, async () => {
-    await db.episodes.where('tmdb_show_id').equals(tmdbId).delete()
+  await db.transaction('rw', [db.shows, db.episodes, db.rankings, db.watched], async () => {
     const show = await db.shows.get(tmdbId)
     if (!show) return
-    // Keep the record if it's ranked or owned; otherwise there's no reason to hold on to it.
-    if (isOwned(show) || (await db.rankings.get(tmdbId))) await db.shows.update(tmdbId, { followed: false, followed_at: null })
+    // If you've ticked any of it, keep the episode list so its watch history (and time in
+    // Your stats) survives. Otherwise the episodes are only needed while following.
+    const ticked = await hasTicks(tmdbId)
+    if (!ticked) await db.episodes.where('tmdb_show_id').equals(tmdbId).delete()
+    // Keep the record if it's ticked, ranked or owned; otherwise there's no reason to hold on to it.
+    if (ticked || isOwned(show) || (await db.rankings.get(tmdbId))) await db.shows.update(tmdbId, { followed: false, followed_at: null })
     else await db.shows.delete(tmdbId)
   })
 }
@@ -49,9 +52,9 @@ export async function setStopped(tmdbId: number, stopped: boolean) {
 /** Tick or untick "Own on DVD" / "Own on streaming". Saves the show if it isn't stored yet. */
 export async function setOwned(tmdbId: number, field: 'own_dvd' | 'own_streaming', value: boolean) {
   const show = await loadShow(tmdbId)
-  await db.transaction('rw', db.shows, db.rankings, async () => {
+  await db.transaction('rw', [db.shows, db.rankings, db.watched], async () => {
     const next: Show = { ...((await db.shows.get(tmdbId)) ?? show), [field]: value }
-    if (next.followed || isOwned(next) || (await db.rankings.get(tmdbId))) await db.shows.put(next)
+    if (next.followed || isOwned(next) || (await db.rankings.get(tmdbId)) || (await hasTicks(tmdbId))) await db.shows.put(next)
     else await db.shows.delete(tmdbId)
   })
 }

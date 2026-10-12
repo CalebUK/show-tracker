@@ -21,7 +21,19 @@ export function Rankings() {
 
   return (
     <>
-      <ScreenHeader title="Rankings">
+      <ScreenHeader
+        title="Rankings"
+        right={
+          rows && rows.length >= 2 ? (
+            <button
+              onClick={() => navigate('/compare')}
+              className="h-8 rounded-full bg-accent/10 px-3.5 text-sm font-medium text-accent-text active:opacity-70 dark:bg-accent/20"
+            >
+              Keep comparing
+            </button>
+          ) : null
+        }
+      >
         {rows && rows.length > 0 && <Chips options={chips} value={filter} onChange={setFilter} />}
       </ScreenHeader>
 

@@ -236,7 +236,7 @@ export function RankFlow({ id }: { id: number }) {
   )
 }
 
-function Choice({ name, poster, onClick }: { name: string; poster: string | null; onClick: () => void }) {
+export function Choice({ name, poster, onClick }: { name: string; poster: string | null; onClick: () => void }) {
   return (
     <button onClick={onClick} className="group flex flex-col items-center text-center transition active:scale-[0.97]">
       <div className="w-full overflow-hidden rounded-xl shadow-sm ring-1 ring-black/5 dark:ring-white/10">

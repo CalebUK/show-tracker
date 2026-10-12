@@ -1,5 +1,5 @@
-import { db, getMeta, isOwned, setMeta, type Bucket, type Ranking, type Show } from '../db'
-import { DEFAULT_QUESTIONS, QUESTION_OPTIONS, ratingToScore, type QuestionSetting } from './elo'
+import { db, getMeta, hasTicks, isOwned, setMeta, type Bucket, type Ranking, type Show } from '../db'
+import { DEFAULT_QUESTIONS, K_KEEP, QUESTION_OPTIONS, eloUpdate, ratingToScore, type QuestionSetting } from './elo'
 import { createStore } from './store'
 
 /** Questions per ranking (Settings → Ranking). Stored per phone; not part of backups. */
@@ -81,10 +81,33 @@ export async function saveRanking(show: Show, result: RankingResult) {
 
 /** Remove a show from the rankings. Other shows keep their ratings. */
 export async function removeRanking(tmdbId: number) {
-  await db.transaction('rw', db.shows, db.rankings, async () => {
+  await db.transaction('rw', [db.shows, db.rankings, db.watched], async () => {
     await db.rankings.delete(tmdbId)
-    // Clean up shows that are no longer followed, ranked or owned.
+    // Clean up shows that are no longer followed, ranked, owned or ticked.
     const show = await db.shows.get(tmdbId)
-    if (show && !show.followed && !isOwned(show)) await db.shows.delete(tmdbId)
+    if (show && !show.followed && !isOwned(show) && !(await hasTicks(tmdbId))) await db.shows.delete(tmdbId)
   })
+}
+
+/**
+ * "Keep comparing": record one answer between two ranked shows (1 = A better, 0 = B better,
+ * 0.5 = too close to call). Both ratings move; scores stay inside their buckets. Returns the
+ * rankings as they were, for undo.
+ */
+export async function saveComparison(aId: number, bId: number, result: number): Promise<Ranking[]> {
+  return db.transaction('rw', db.rankings, async () => {
+    const [a, b] = await db.rankings.bulkGet([aId, bId])
+    if (!a || !b) return []
+    const [ra, rb] = eloUpdate(a.rating, b.rating, result, K_KEEP, K_KEEP)
+    await db.rankings.bulkPut([
+      { ...a, rating: ra, comparisons: a.comparisons + 1, score: ratingToScore(a.bucket, ra) },
+      { ...b, rating: rb, comparisons: b.comparisons + 1, score: ratingToScore(b.bucket, rb) },
+    ])
+    return [a, b]
+  })
+}
+
+/** Put rankings back exactly as they were (undo for Keep comparing). */
+export async function restoreRankings(previous: Ranking[]) {
+  await db.rankings.bulkPut(previous)
 }

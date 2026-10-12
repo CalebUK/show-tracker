@@ -7,11 +7,12 @@ import { Button } from './Layout'
 export function TmdbKeyHelp() {
   return (
     <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-      Show info comes from TMDB, which needs a free API key. Make a TMDB account, then request a key under{' '}
+      Show info comes from TMDB, which needs a free API token. Make a TMDB account, request API access under{' '}
       <a className="text-accent-text" href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer">
         Settings → API
       </a>
-      . Either the API Key or the API Read Access Token works. It's kept only on this phone and isn't included in backups.
+      , then copy the long <span className="font-medium text-neutral-700 dark:text-neutral-200">API Read Access Token</span> (not
+      the shorter API Key). It's kept only on this phone and isn't included in backups.
     </p>
   )
 }
@@ -29,7 +30,7 @@ export function TmdbKeyForm({ onSaved, onCancel }: { onSaved?: () => void; onCan
     try {
       await saveTmdbKey(value)
       setValue('')
-      toast('TMDB key saved')
+      toast('TMDB token saved')
       refreshFollowed()
       onSaved?.()
     } catch (err) {
@@ -45,7 +46,7 @@ export function TmdbKeyForm({ onSaved, onCancel }: { onSaved?: () => void; onCan
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="Paste your TMDB key"
+        placeholder="Paste your API Read Access Token"
         aria-label="TMDB key"
         autoComplete="off"
         autoCorrect="off"

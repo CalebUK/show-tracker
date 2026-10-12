@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Bucket } from '../db'
-import { eloUpdate, expectedScore, kFor, pickOpponent, questionCount, ratingToScore, rawScore, scoreToRating, startingRating, suggestedBucket } from './elo'
+import { eloUpdate, expectedScore, kFor, pickOpponent, questionCount, randomPair, ratingToScore, rawScore, scoreToRating, startingRating, suggestedBucket } from './elo'
 
 describe('scores and ratings', () => {
   it('maps 1500 to 5.0 and 100 points to one point of score', () => {
@@ -121,5 +121,30 @@ describe('suggestedBucket', () => {
   it('rounds like the displayed score, so 6.75 counts as Liked', () => {
     expect(suggestedBucket('fine', scoreToRating(6.75))).toBe('liked')
     expect(rawScore(scoreToRating(6.74))).toBe(6.7)
+  })
+})
+
+describe('randomPair', () => {
+  const seq = (...values: number[]) => {
+    let i = 0
+    return () => values[i++ % values.length]
+  }
+
+  it('picks two different shows', () => {
+    for (let n = 0; n < 50; n++) {
+      const [a, b] = randomPair([1, 2, 3, 4, 5])!
+      expect(a).not.toBe(b)
+    }
+  })
+
+  it("doesn't repeat the previous pair when it can avoid it", () => {
+    // First attempt would give [1, 2] again; the second gives something else.
+    const pair = randomPair([1, 2, 3], [2, 1], seq(0, 0, 0.9, 0.9))
+    expect(pair).not.toEqual([1, 2])
+  })
+
+  it('needs at least two shows', () => {
+    expect(randomPair([1])).toBeNull()
+    expect(randomPair([1, 2], [1, 2])).toEqual(expect.arrayContaining([1, 2]))
   })
 })

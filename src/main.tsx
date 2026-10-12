@@ -6,11 +6,14 @@ import { loadRegion, loadTmdbKey } from './lib/tmdb'
 import { applyTheme } from './lib/theme'
 import { loadQuestionSetting } from './lib/ranking'
 import { App } from './App'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import './index.css'
 
 registerSW({ immediate: true })
 requestPersistentStorage()
 applyTheme()
+// The old image cache held opaque responses that inflate storage use; it's been replaced by tmdb-images-v2.
+if ('caches' in window) caches.delete('tmdb-images').catch(() => {})
 
 // Load per-phone settings first so Search doesn't flash the "add a key" prompt.
 Promise.all([loadTmdbKey(), loadRegion(), loadQuestionSetting()])
@@ -18,7 +21,9 @@ Promise.all([loadTmdbKey(), loadRegion(), loadQuestionSetting()])
   .finally(() =>
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
-        <App />
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
       </StrictMode>,
     ),
   )

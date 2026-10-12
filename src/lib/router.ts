@@ -10,6 +10,7 @@ export type Route =
   | { name: Tab }
   | { name: 'show'; id: number }
   | { name: 'rank'; id: number }
+  | { name: 'compare' }
 
 export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/')
@@ -20,6 +21,8 @@ export function parseRoute(hash: string): Route {
     case 'search':
     case 'settings':
       return { name: parts[0] }
+    case 'compare':
+      return { name: 'compare' }
     case 'show':
     case 'rank':
       if (Number.isInteger(id) && id > 0) return { name: parts[0], id }
@@ -27,7 +30,7 @@ export function parseRoute(hash: string): Route {
   return { name: 'watching' }
 }
 
-export const isTab = (r: Route): r is { name: Tab } => r.name !== 'show' && r.name !== 'rank'
+export const isTab = (r: Route): r is { name: Tab } => r.name !== 'show' && r.name !== 'rank' && r.name !== 'compare'
 
 const depth = () => (history.state as { depth?: number } | null)?.depth ?? 0
 

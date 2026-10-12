@@ -139,7 +139,7 @@ function ResultRow({ result, followed, score }: { result: SearchResult; followed
   const watchedItAll = async () => {
     setBusy('watched')
     try {
-      const ticked = await followAndWatchAll(result.id)
+      const ticked = await followAndWatchAll(result.id, { promptToRate: false })
       setChoosing(false)
       toast(ticked ? `Ticked all ${ticked} episodes. Now rate it` : `Following ${result.name}. Now rate it`)
       navigate(`/rank/${result.id}`)

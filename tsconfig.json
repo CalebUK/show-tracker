@@ -11,9 +11,10 @@
     "noFallthroughCasesInSwitch": true,
     "isolatedModules": true,
     "moduleDetection": "force",
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "noEmit": true,
     "types": ["vite/client", "vite-plugin-pwa/client"]
   },
-  "include": ["src", "vite.config.ts", "pwa-assets.config.ts"]
+  "include": ["src", "vite.config.ts", "pwa-assets.config.ts", "vercel.json"]
 }

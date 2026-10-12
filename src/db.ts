@@ -70,6 +70,9 @@ export interface Watched {
 
 export const episodeKey = (showId: number, season: number, number: number) => `${showId}:${season}:${number}`
 
+/** Whether any episode of a show is ticked. Ticked shows keep their record and episode list after unfollowing. */
+export const hasTicks = async (showId: number) => (await db.watched.where('tmdb_show_id').equals(showId).count()) > 0
+
 export type Bucket = 'liked' | 'fine' | 'disliked'
 
 export interface Ranking {

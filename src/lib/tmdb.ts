@@ -18,17 +18,27 @@ export async function loadTmdbKey() {
   tmdbKeyStore.set((await getMeta<string>('tmdbKey')) ?? '')
 }
 
+/**
+ * The v4 "API Read Access Token" (a JWT) is sent in a request header. The older v3 "API Key" has
+ * to go in the URL, where it can end up in logs, so new keys must be the token. Keys saved before
+ * this rule (and a v3 key in .env during development) still work.
+ */
+export const isReadAccessToken = (key: string) => key.startsWith('eyJ')
+
 /** Check the key with TMDB, then store it on this device. Throws a readable error if it doesn't work. */
 export async function saveTmdbKey(input: string) {
   const key = input.trim()
-  if (!key) throw new Error('Paste your key first.')
+  if (!key) throw new Error('Paste your token first.')
+  if (!isReadAccessToken(key)) {
+    throw new Error('That looks like the short API Key. Paste the longer "API Read Access Token" instead (it starts with eyJ).')
+  }
   let res: Response
   try {
     res = await fetch(...request('/authentication', {}, key))
   } catch {
     throw new Error("Couldn't reach TMDB to check the key. Are you online?")
   }
-  if (res.status === 401) throw new Error("TMDB didn't accept that key. Check that you copied all of it.")
+  if (res.status === 401) throw new Error("TMDB didn't accept that token. Check that you copied all of it.")
   if (!res.ok) throw new Error(`TMDB ${res.status}: ${res.statusText}`)
   await setMeta('tmdbKey', key)
   tmdbKeyStore.set(key)
@@ -41,12 +51,20 @@ export async function removeTmdbKey() {
   detailsCache.clear()
 }
 
+/**
+ * Images are loaded with CORS (crossOrigin="anonymous") so the offline cache stores them at their
+ * real size. `?cors` gives those loads their own URL: TMDB only adds the CORS header when asked
+ * and doesn't send `Vary: Origin`, so a copy cached by an earlier non-CORS load would be reused
+ * and fail. TMDB ignores the query string and serves the same image.
+ */
+const CORS_MARK = '?cors'
+
 export function posterUrl(path: string | null | undefined, size: 'w92' | 'w185' | 'w342' | 'w500' = 'w185') {
-  return path ? `${IMAGE}/${size}${path}` : null
+  return path ? `${IMAGE}/${size}${path}${CORS_MARK}` : null
 }
 
 export function logoUrl(path: string | null | undefined) {
-  return path ? `${IMAGE}/w92${path}` : null
+  return path ? `${IMAGE}/w92${path}${CORS_MARK}` : null
 }
 
 /** Best guess from the phone's language setting (en-GB → GB). Not always right, so it can be overridden. */
@@ -89,7 +107,7 @@ function request(path: string, params: Record<string, string>, key: string): [UR
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
   const headers: Record<string, string> = { accept: 'application/json' }
   // A v4 read access token is a JWT; a v3 API key is a short hex string.
-  if (key.startsWith('eyJ')) headers.authorization = `Bearer ${key}`
+  if (isReadAccessToken(key)) headers.authorization = `Bearer ${key}`
   else url.searchParams.set('api_key', key)
   return [url, { headers }]
 }

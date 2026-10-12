@@ -9,6 +9,8 @@ import { Search } from './screens/Search'
 import { Settings } from './screens/Settings'
 import { ShowDetail } from './screens/ShowDetail'
 import { RankFlow } from './screens/RankFlow'
+import { KeepComparing } from './screens/KeepComparing'
+import { RatePrompt } from './components/RatePrompt'
 
 const SCREENS: Record<Tab, () => React.JSX.Element> = {
   watching: Watching,
@@ -50,6 +52,8 @@ export function App() {
       <TabBar active={tab} />
       {route.name === 'show' && <ShowDetail key={route.id} id={route.id} />}
       {route.name === 'rank' && <RankFlow key={route.id} id={route.id} />}
+      {route.name === 'compare' && <KeepComparing />}
+      <RatePrompt hidden={route.name === 'rank'} />
       <Toast />
     </>
   )

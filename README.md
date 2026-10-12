@@ -13,7 +13,7 @@ npm run dev
 
 Each phone stores its own TMDB key. The app asks for one on the Search screen (and in Settings). It's checked with TMDB before saving, kept only in that phone's IndexedDB, and left out of backups. The deployed site never contains a key, so the repo and hosting can be public.
 
-Get a free key at themoviedb.org → Settings → API. Either the v3 "API Key" or the v4 "API Read Access Token" works. Two people can each use their own, or paste the same one into both phones.
+Get it free at themoviedb.org → Settings → API: use the long **API Read Access Token** (v4), which is sent in a request header. The shorter v3 "API Key" goes in the URL, so the app no longer accepts it for new saves (keys saved earlier still work, with a nudge in Settings to switch). Two people can each use their own, or paste the same one into both phones.
 
 For local development you can skip pasting by copying `.env.example` to `.env` and setting `VITE_TMDB_KEY`. Only `npm run dev` reads it; production builds ignore it.
 
@@ -75,3 +75,9 @@ A few choices the spec left open:
 - In **Search**, **+** opens a pop-up: **Start tracking** (follow it) or **Watched it all** (follow it, tick every aired episode, then go straight into rating it).
 - **Time watched** on a show's Episodes section adds up the runtimes of ticked episodes ("3d 5h watched · 3d 4h to go"). Runtimes come from TMDB where it has them (real lengths, e.g. 43 min), otherwise TVmaze (often the TV slot, e.g. 60). Each episode is looked up once; episodes with no runtime count as the show's average.
 - **Your stats** at the top of Settings adds up episodes watched, time watched and shows finished (ended and fully watched) across every show.
+- **Security headers** live in `vercel.json` (Content-Security-Policy limiting scripts to the app and connections to TMDB/TVmaze, no framing, nosniff, no referrer, and a locked-down Permissions-Policy). `npm run preview` sends the same headers so they can be tested locally. The light/dark script is a file (`public/theme-init.js`) rather than inline, so the policy can stay `script-src 'self'`.
+- **Poster cache**: TMDB images are loaded with CORS and a `?cors` marker on the URL, so the offline cache stores them at their real size (opaque responses count as ~7 MB each against the storage quota). The marker matters because TMDB doesn't send `Vary: Origin`, so copies cached by older, non-CORS loads would otherwise be reused and fail.
+- A **safety-net screen** (error boundary) replaces a blank page if something crashes, with Reload and Export backup.
+- Unfollowing a show you've **ticked episodes of** keeps its record and episode list, so its history and time stay in Your stats.
+- Ticking the episode that **finishes** an unranked show offers to rate it.
+- **Keep comparing** (Rankings tab) serves endless random pairs of ranked shows. Each answer is saved immediately and moves both ratings (K = 24); Undo and Skip are there too.
