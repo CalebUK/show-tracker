@@ -3,13 +3,14 @@ import type { Episode, Show } from '../db'
 import { episodeLabel, formatShortDate } from '../lib/dates'
 import { isFinished, nextSeasonNote, type Progress } from '../lib/progress'
 import { navigate } from '../lib/router'
+import { canStream, myServicesStore, whereToWatch } from '../lib/services'
 import { useLibrary } from '../hooks/useLibrary'
 import { useNow } from '../hooks/useNow'
 import { Button, Chips, EmptyState, ScreenHeader } from '../components/Layout'
 import { Poster } from '../components/Poster'
 import { PlusIcon } from '../components/Icons'
 
-type Filter = 'following' | 'notStarted' | 'finished'
+type Filter = 'following' | 'stream' | 'notStarted' | 'finished'
 
 // Kept outside the component so switching tabs doesn't reset the filter.
 let lastFilter: Filter = 'following'
@@ -34,6 +35,7 @@ function saveHide(value: boolean) {
 export function Shows() {
   const now = useNow()
   const library = useLibrary(now)
+  const myServices = myServicesStore.use()
   const [filter, setFilterState] = useState<Filter>(lastFilter)
   const setFilter = (f: Filter) => setFilterState((lastFilter = f))
   const [hideCaughtUp, setHideState] = useState(loadHide)
@@ -44,14 +46,17 @@ export function Shows() {
 
   const progress = (s: Show) => library!.progress.get(s.tmdb_id)!
   const finished = (s: Show) => isFinished(s, progress(s))
+  const following = library?.followed.filter((s) => !finished(s)) ?? []
   const lists = library && {
     // Finished shows (ended and fully watched) move out of the main list into their own.
-    following: library.followed.filter((s) => !finished(s)),
+    following,
+    // On one of your services (Settings → Streaming services), or owned on DVD or streaming.
+    stream: following.filter((s) => canStream(s, myServices)),
     notStarted: library.followed.filter((s) => !s.stopped && !progress(s).started),
     finished: library.followed.filter(finished),
   }
   const hasAny = (library?.followed.length ?? 0) > 0
-  const canHide = filter === 'following'
+  const canHide = filter === 'following' || filter === 'stream'
   const shows = (lists?.[filter] ?? []).filter((s) => !(canHide && hideCaughtUp && progress(s).caughtUp))
   const hiddenCount = (lists?.[filter].length ?? 0) - shows.length
 
@@ -76,6 +81,7 @@ export function Shows() {
             <Chips
               options={[
                 { id: 'following', label: 'Following', count: lists.following.length },
+                { id: 'stream', label: 'Able to stream', count: lists.stream.length },
                 { id: 'notStarted', label: 'Not started', count: lists.notStarted.length },
                 { id: 'finished', label: 'Finished', count: lists.finished.length },
               ]}
@@ -105,11 +111,31 @@ export function Shows() {
           action={<Button onClick={() => navigate('/search', { replace: true })}>Find a show</Button>}
         />
       ) : lists && shows.length === 0 ? (
-        <p className="px-5 pt-8 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-          {emptyMessage(filter, hiddenCount, lists.finished.length)}
-        </p>
+        <div className="px-5 pt-8">
+          <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+            {filter === 'stream' && hiddenCount === 0
+              ? myServices.length === 0
+                ? 'Tick the streaming services you have in Settings, and the shows you follow that are on them will appear here, along with any you own on DVD or streaming.'
+                : "None of the shows you follow are on your streaming services right now, and you haven't marked any as owned."
+              : emptyMessage(filter, hiddenCount, lists.finished.length)}
+          </p>
+          {filter === 'stream' && hiddenCount === 0 && (
+            <Button variant="secondary" className="mt-4" onClick={() => navigate('/settings', { replace: true })}>
+              Choose your services
+            </Button>
+          )}
+        </div>
       ) : (
         <ul className="pb-6">
+          {filter === 'stream' && myServices.length === 0 && (
+            <li className="px-5 pb-2 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+              These are the shows you own. Tick your streaming services in{' '}
+              <button onClick={() => navigate('/settings', { replace: true })} className="text-accent-text">
+                Settings
+              </button>{' '}
+              to add the shows on them.
+            </li>
+          )}
           {shows.map((show) => (
             <li key={show.tmdb_id}>
               <button
@@ -124,6 +150,7 @@ export function Shows() {
                       ? finishedLine(show, progress(show))
                       : statusLine(show, progress(show), library!.nextUp.get(show.tmdb_id), now)}
                   </div>
+                  {filter === 'stream' && <div className="truncate text-xs text-accent-text">{whereToWatch(show, myServices)}</div>}
                 </div>
               </button>
             </li>

@@ -1,5 +1,6 @@
 import { db, getMeta, setMeta, type Provider, type Show } from '../db'
 import { createStore } from './store'
+import { foldVariants } from './services'
 
 const API = 'https://api.themoviedb.org/3'
 const IMAGE = 'https://image.tmdb.org/t/p'
@@ -93,6 +94,22 @@ export async function setRegion(code: string) {
 
 const regionNames = new Intl.DisplayNames(undefined, { type: 'region' })
 export const regionName = (code: string) => regionNames.of(code) ?? code
+
+/** Rent/buy stores TMDB includes in its service list; shows' streaming lists never use them. */
+const STORES = new Set([2, 3, 7, 10, 68, 130]) // Apple TV Store, Google Play, Fandango at Home, Amazon Video, Microsoft Store, Sky Store
+
+/** Every streaming service TMDB lists for the region, most popular first, with variants folded in. */
+export async function getRegionServices(): Promise<Provider[]> {
+  const code = region()
+  const data = await get<{ results: (TmdbProvider & { display_priorities?: Record<string, number> })[] }>('/watch/providers/tv', {
+    watch_region: code,
+  })
+  const list = data.results
+    .filter((p) => !STORES.has(p.provider_id))
+    .sort((a, b) => (a.display_priorities?.[code] ?? 999) - (b.display_priorities?.[code] ?? 999))
+    .map((p) => ({ id: p.provider_id, name: p.provider_name, logo_path: p.logo_path }))
+  return foldVariants(list)
+}
 
 /** Countries TMDB has streaming data for. */
 export async function getStreamingRegions(): Promise<{ code: string; name: string }[]> {

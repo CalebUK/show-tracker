@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, getMeta } from '../db'
+import { db, getMeta, type Provider } from '../db'
 import { buildBackup, parseBackup, restoreBackup, saveFile, type BackupFile } from '../lib/backup'
 import { installPrompt, isIOS, isStandalone } from '../lib/install'
 import { formatDuration, timeAgo } from '../lib/dates'
@@ -13,20 +13,24 @@ import {
   DEV_KEY,
   isReadAccessToken,
   detectedRegion,
+  getRegionServices,
   getStreamingRegions,
+  logoUrl,
   regionName,
   regionStore,
   removeTmdbKey,
   setRegion,
   tmdbKeyStore,
+  useRegion,
   useTmdbKey,
 } from '../lib/tmdb'
 import { Button, ScreenHeader } from '../components/Layout'
-import { ChevronIcon, CoffeeIcon } from '../components/Icons'
+import { ChevronIcon, CoffeeIcon, Spinner } from '../components/Icons'
 import { setThemePref, themeStore, type ThemePref } from '../lib/theme'
 import { questionsStore, setQuestionSetting } from '../lib/ranking'
 import { onAirFilterStore, setOnAirFilter } from '../lib/onAir'
 import { defaultViewStore, setDefaultView } from '../lib/trackingView'
+import { myServicesStore, sameService, servicesOnShows, setServiceTicked } from '../lib/services'
 import { QUESTION_OPTIONS } from '../lib/elo'
 import { TmdbKeyForm, TmdbKeyHelp } from '../components/TmdbKeyForm'
 
@@ -155,6 +159,7 @@ export function Settings() {
 
         <TmdbKeySection />
         <RegionSection />
+        <ServicesSection />
         <OnAirSection />
         <TrackingViewSection />
         <RankingSection />
@@ -326,6 +331,123 @@ function RegionSection() {
         ))}
       </select>
     </Section>
+  )
+}
+
+function ServicesSection() {
+  const mine = myServicesStore.use()
+  const regionCode = useRegion()
+  const tmdbKey = useTmdbKey()
+  const followed = useLiveQuery(() => db.shows.filter((s) => s.followed).toArray(), [])
+  const [showMore, setShowMore] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  const [more, setMore] = useState<Provider[] | 'loading' | 'error'>('loading')
+
+  // TMDB's full list for the region, fetched only when asked for.
+  useEffect(() => {
+    if (!showMore || !tmdbKey) return
+    let cancelled = false
+    setMore('loading')
+    getRegionServices().then(
+      (list) => !cancelled && setMore(list),
+      () => !cancelled && setMore('error'),
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [showMore, tmdbKey, regionCode, attempt])
+
+  if (!followed) return null
+  const onShows = servicesOnShows(followed)
+  // Ticked services that none of your shows are on stay listed, so they can be unticked.
+  const extra = mine.filter((s) => !onShows.some((o) => sameService(o.service, s))).map((service) => ({ service, count: 0 }))
+  const listed = [...onShows, ...extra]
+  const others = Array.isArray(more) ? more.filter((p) => !listed.some((l) => sameService(l.service, p))) : []
+  const ticked = (service: Provider) => mine.some((s) => sameService(s, service))
+  const toggle = (service: Provider, value: boolean) => setServiceTicked(service, value).catch((err) => toast(errorMessage(err)))
+  const note = 'mt-3 text-sm text-neutral-500 dark:text-neutral-400'
+
+  return (
+    <Section title="Streaming services">
+      <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        Tick the ones you have. Shows → Able to stream then lists the shows you follow that are on them, plus any you own on DVD
+        or streaming.
+      </p>
+      {listed.length > 0 ? (
+        <ul className="mt-2">
+          {listed.map(({ service, count }) => (
+            <ServiceRow
+              key={service.id}
+              service={service}
+              detail={count ? `${count} show${count === 1 ? '' : 's'}` : 'None of your shows'}
+              checked={ticked(service)}
+              onChange={toggle}
+            />
+          ))}
+        </ul>
+      ) : (
+        <p className={note}>The services your shows are on will appear here once you follow some.</p>
+      )}
+      {!showMore ? (
+        <button onClick={() => setShowMore(true)} className="mt-2 text-sm text-accent-text">
+          More services in {regionName(regionCode)}
+        </button>
+      ) : !tmdbKey ? (
+        <p className={note}>Add your TMDB token above to see every service.</p>
+      ) : more === 'loading' ? (
+        <div className="mt-3 flex justify-center text-neutral-400">
+          <Spinner />
+        </div>
+      ) : more === 'error' ? (
+        <p className={note}>
+          Couldn't load the full list.{' '}
+          <button onClick={() => setAttempt((n) => n + 1)} className="text-accent-text">
+            Try again
+          </button>
+        </p>
+      ) : (
+        <>
+          <h3 className="mt-4 text-xs font-medium text-neutral-500 dark:text-neutral-400">More in {regionName(regionCode)}</h3>
+          <ul className="mt-1">
+            {others.map((service) => (
+              <ServiceRow key={service.id} service={service} checked={ticked(service)} onChange={toggle} />
+            ))}
+          </ul>
+        </>
+      )}
+    </Section>
+  )
+}
+
+function ServiceRow({
+  service,
+  detail,
+  checked,
+  onChange,
+}: {
+  service: Provider
+  detail?: string
+  checked: boolean
+  onChange: (service: Provider, value: boolean) => void
+}) {
+  return (
+    <li>
+      <label className="flex cursor-pointer items-center gap-3 py-2">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(service, e.target.checked)}
+          className="h-5 w-5 shrink-0 cursor-pointer accent-accent"
+        />
+        {service.logo_path ? (
+          <img src={logoUrl(service.logo_path)!} alt="" crossOrigin="anonymous" className="h-7 w-7 shrink-0 rounded-lg" loading="lazy" />
+        ) : (
+          <span className="h-7 w-7 shrink-0 rounded-lg bg-neutral-100 dark:bg-neutral-800" />
+        )}
+        <span className="min-w-0 flex-1 truncate text-[15px]">{service.name}</span>
+        {detail && <span className="shrink-0 text-sm text-neutral-400">{detail}</span>}
+      </label>
+    </li>
   )
 }
 
