@@ -26,6 +26,7 @@ import { ChevronIcon, CoffeeIcon } from '../components/Icons'
 import { setThemePref, themeStore, type ThemePref } from '../lib/theme'
 import { questionsStore, setQuestionSetting } from '../lib/ranking'
 import { onAirFilterStore, setOnAirFilter } from '../lib/onAir'
+import { defaultViewStore, setDefaultView } from '../lib/trackingView'
 import { QUESTION_OPTIONS } from '../lib/elo'
 import { TmdbKeyForm, TmdbKeyHelp } from '../components/TmdbKeyForm'
 
@@ -155,6 +156,7 @@ export function Settings() {
         <TmdbKeySection />
         <RegionSection />
         <OnAirSection />
+        <TrackingViewSection />
         <RankingSection />
         <AppearanceSection />
         <InstallSection />
@@ -344,6 +346,25 @@ function OnAirSection() {
         ]}
         value={filter}
         onChange={setOnAirFilter}
+        className="mt-3"
+      />
+    </Section>
+  )
+}
+
+function TrackingViewSection() {
+  const view = defaultViewStore.use()
+  return (
+    <Section title="Tracking opens on">
+      <p className="text-sm text-neutral-500 dark:text-neutral-400">Which view you see first when you open the Tracking tab.</p>
+      <Segmented
+        label="Tracking opens on"
+        options={[
+          { id: 'watching', label: 'Watching' },
+          { id: 'onair', label: 'On air' },
+        ]}
+        value={view}
+        onChange={setDefaultView}
         className="mt-3"
       />
     </Section>

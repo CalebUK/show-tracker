@@ -6,6 +6,7 @@ import { refreshFollowed, refreshStore } from '../lib/shows'
 import { setWatched } from '../lib/watched'
 import { getTmdbKey } from '../lib/tmdb'
 import { isOnCurrentSeason, onAirFilterStore } from '../lib/onAir'
+import { defaultViewStore, type TrackingView } from '../lib/trackingView'
 import { navigate } from '../lib/router'
 import { errorMessage, toast } from '../lib/toast'
 import { isWatched, useLibrary } from '../hooks/useLibrary'
@@ -22,7 +23,7 @@ const SECTIONS: { id: keyof UpcomingGroups; title: string }[] = [
   { id: 'later', title: 'Later' },
 ]
 
-type View = 'watching' | 'onair'
+type View = TrackingView
 const VIEWS: { id: View; label: string }[] = [
   { id: 'watching', label: 'Watching' },
   { id: 'onair', label: 'On air' },
@@ -31,8 +32,10 @@ const VIEWS: { id: View; label: string }[] = [
 /** Further out than this, a show's next date goes in the "Save the Date" section. */
 const SOON_MONTHS = 3
 
-// Kept outside the component so switching tabs doesn't reset it.
-let lastView: View = 'watching'
+// Kept outside the component so switching tabs doesn't reset it. Starts on the default from
+// Settings, and changing that default starts over from it.
+let lastView: View = defaultViewStore.get()
+defaultViewStore.subscribe(() => void (lastView = defaultViewStore.get()))
 
 export function Tracking() {
   const now = useNow()
