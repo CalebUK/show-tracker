@@ -380,48 +380,63 @@ function ServicesSection() {
         Tick the ones you have. Shows → Able to stream then lists the shows you follow that are on them, plus any you own on DVD
         or streaming.
       </p>
-      {listed.length > 0 ? (
-        <ul className="mt-2">
-          {listed.map(({ service, count }) => (
-            <ServiceRow
-              key={service.id}
-              service={service}
-              detail={count ? `${count} show${count === 1 ? '' : 's'}` : 'None of your shows'}
-              checked={ticked(service)}
-              onChange={toggle}
-            />
-          ))}
-        </ul>
-      ) : (
-        <p className={note}>The services your shows are on will appear here once you follow some.</p>
-      )}
-      {!showMore ? (
-        <button onClick={() => setShowMore(true)} className="mt-2 text-sm text-accent-text">
-          More services in {regionName(regionCode)}
-        </button>
-      ) : !tmdbKey ? (
-        <p className={note}>Add your TMDB token above to see every service.</p>
-      ) : more === 'loading' ? (
-        <div className="mt-3 flex justify-center text-neutral-400">
-          <Spinner />
+      {/* Collapsed by default: the summary shows what's ticked, the list opens on tap. */}
+      <details className="group mt-3 rounded-xl bg-neutral-50 dark:bg-neutral-900">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-medium">Your services</span>
+            <span className="block truncate text-xs text-neutral-500 dark:text-neutral-400">
+              {mine.length ? mine.map((s) => s.name).join(', ') : 'None ticked yet'}
+            </span>
+          </span>
+          {mine.length > 0 && <span className="text-sm text-neutral-500 tabular-nums dark:text-neutral-400">{mine.length}</span>}
+          <ChevronIcon width={18} height={18} className="shrink-0 text-neutral-400 transition group-open:rotate-90" />
+        </summary>
+        <div className="px-4 pb-3">
+          {listed.length > 0 ? (
+            <ul className="mt-2">
+              {listed.map(({ service, count }) => (
+                <ServiceRow
+                  key={service.id}
+                  service={service}
+                  detail={count ? `${count} show${count === 1 ? '' : 's'}` : 'None of your shows'}
+                  checked={ticked(service)}
+                  onChange={toggle}
+                />
+              ))}
+            </ul>
+          ) : (
+            <p className={note}>The services your shows are on will appear here once you follow some.</p>
+          )}
+          {!showMore ? (
+            <button onClick={() => setShowMore(true)} className="mt-2 text-sm text-accent-text">
+              More services in {regionName(regionCode)}
+            </button>
+          ) : !tmdbKey ? (
+            <p className={note}>Add your TMDB token above to see every service.</p>
+          ) : more === 'loading' ? (
+            <div className="mt-3 flex justify-center text-neutral-400">
+              <Spinner />
+            </div>
+          ) : more === 'error' ? (
+            <p className={note}>
+              Couldn't load the full list.{' '}
+              <button onClick={() => setAttempt((n) => n + 1)} className="text-accent-text">
+                Try again
+              </button>
+            </p>
+          ) : (
+            <>
+              <h3 className="mt-4 text-xs font-medium text-neutral-500 dark:text-neutral-400">More in {regionName(regionCode)}</h3>
+              <ul className="mt-1">
+                {others.map((service) => (
+                  <ServiceRow key={service.id} service={service} checked={ticked(service)} onChange={toggle} />
+                ))}
+              </ul>
+            </>
+          )}
         </div>
-      ) : more === 'error' ? (
-        <p className={note}>
-          Couldn't load the full list.{' '}
-          <button onClick={() => setAttempt((n) => n + 1)} className="text-accent-text">
-            Try again
-          </button>
-        </p>
-      ) : (
-        <>
-          <h3 className="mt-4 text-xs font-medium text-neutral-500 dark:text-neutral-400">More in {regionName(regionCode)}</h3>
-          <ul className="mt-1">
-            {others.map((service) => (
-              <ServiceRow key={service.id} service={service} checked={ticked(service)} onChange={toggle} />
-            ))}
-          </ul>
-        </>
-      )}
+      </details>
     </Section>
   )
 }
