@@ -58,20 +58,31 @@ export const kFor = (questionIndex: number, refining: boolean) => (refining || q
 /** "Keep comparing": two already-ranked shows, so both move by the same, moderate amount. */
 export const K_KEEP = 24
 
+/** The same key for a pair whichever way round it is. */
+export const pairKey = <T>(a: T, b: T) => [String(a), String(b)].sort().join('|')
+
 /**
- * Two different shows picked completely at random, avoiding an exact repeat of the previous
- * pair when there are more than two to choose from. null with fewer than two.
+ * Two different shows picked completely at random from the pairs whose `pairKey` isn't in
+ * `used`. null once every pair has been used, or with fewer than two.
  */
-export function randomPair<T>(items: T[], previous?: readonly [T, T] | null, random = Math.random): [T, T] | null {
-  if (items.length < 2) return null
-  const same = (a: T, b: T) => !!previous && ((a === previous[0] && b === previous[1]) || (a === previous[1] && b === previous[0]))
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const i = Math.floor(random() * items.length)
-    let j = Math.floor(random() * (items.length - 1))
+export function randomPair<T>(items: T[], used: ReadonlySet<string> = new Set(), random = Math.random): [T, T] | null {
+  const n = items.length
+  if (n < 2) return null
+  // Random tries first: plenty of pairs are left for most of a session.
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const i = Math.floor(random() * n)
+    let j = Math.floor(random() * (n - 1))
     if (j >= i) j++
-    if (items.length === 2 || !same(items[i], items[j])) return [items[i], items[j]]
+    if (!used.has(pairKey(items[i], items[j]))) return [items[i], items[j]]
   }
-  return [items[0], items[1]]
+  // Near the end, pick from whatever's left.
+  const left: [T, T][] = []
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) if (!used.has(pairKey(items[i], items[j]))) left.push([items[i], items[j]])
+  }
+  if (!left.length) return null
+  const [a, b] = left[Math.floor(random() * left.length)]
+  return random() < 0.5 ? [a, b] : [b, a]
 }
 
 /** Chance that a show rated `a` is preferred over one rated `b`. */

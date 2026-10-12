@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Bucket } from '../db'
-import { eloUpdate, expectedScore, kFor, pickOpponent, questionCount, randomPair, ratingToScore, rawScore, scoreToRating, startingRating, suggestedBucket } from './elo'
+import { eloUpdate, expectedScore, kFor, pairKey, pickOpponent, questionCount, randomPair, ratingToScore, rawScore, scoreToRating, startingRating, suggestedBucket } from './elo'
 
 describe('scores and ratings', () => {
   it('maps 1500 to 5.0 and 100 points to one point of score', () => {
@@ -137,14 +137,31 @@ describe('randomPair', () => {
     }
   })
 
-  it("doesn't repeat the previous pair when it can avoid it", () => {
-    // First attempt would give [1, 2] again; the second gives something else.
-    const pair = randomPair([1, 2, 3], [2, 1], seq(0, 0, 0.9, 0.9))
+  it('skips pairs already used, whichever way round', () => {
+    // The first attempt would give [1, 2]; that pair was used as [2, 1], so the next attempt wins.
+    const pair = randomPair([1, 2, 3], new Set([pairKey(2, 1)]), seq(0, 0, 0.9, 0.9))
     expect(pair).not.toEqual([1, 2])
+  })
+
+  it('serves every pair exactly once, then runs out', () => {
+    const ids = [1, 2, 3, 4, 5, 6]
+    const used = new Set<string>()
+    for (let n = 0; n < 15; n++) {
+      const pair = randomPair(ids, used)!
+      expect(used.has(pairKey(...pair))).toBe(false)
+      used.add(pairKey(...pair))
+    }
+    expect(used.size).toBe(15)
+    expect(randomPair(ids, used)).toBeNull()
+  })
+
+  it('finds the last pair left even when random tries keep missing it', () => {
+    const used = new Set([pairKey(1, 2), pairKey(1, 3)])
+    expect(randomPair([1, 2, 3], used, () => 0)).toEqual(expect.arrayContaining([2, 3]))
   })
 
   it('needs at least two shows', () => {
     expect(randomPair([1])).toBeNull()
-    expect(randomPair([1, 2], [1, 2])).toEqual(expect.arrayContaining([1, 2]))
+    expect(randomPair([])).toBeNull()
   })
 })

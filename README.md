@@ -83,5 +83,5 @@ A few choices the spec left open:
 - A **safety-net screen** (error boundary) replaces a blank page if something crashes, with Reload and Export backup.
 - Unfollowing a show you've **ticked episodes of** keeps its record and episode list, so its history and time stay in Your stats.
 - Ticking the episode that **finishes** an unranked show offers to rate it.
-- **Keep comparing** (Rankings tab) serves endless random pairs of ranked shows. Each answer is saved immediately and moves both ratings (K = 24); Undo and Skip are there too.
+- **Keep comparing** (Rankings tab) serves random pairs of ranked shows. Each answer is saved immediately and moves both ratings (K = 24); Undo and Skip are there too. Each pair comes up only once per session (answered or skipped); once every pair has been used, it says so and offers to find a show to rank. Leaving and coming back starts a new session.
 - **Backups don't include "Where to stream"**: it changes all the time, so it always comes fresh from TMDB (on each refresh of followed shows, and live on the show page for others). Older backups that contain it have it ignored.
