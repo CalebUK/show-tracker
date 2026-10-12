@@ -167,20 +167,21 @@ export function Tracking() {
               </Section>
             )}
             {data.caughtUp.length > 0 && (
-              <Section title="Caught up">
-                {data.caughtUp.map((show) => {
-                  const next = data.nextDate.get(show.tmdb_id)
-                  return (
-                    <QuietRow
-                      key={show.tmdb_id}
-                      show={show}
-                      detail={next ? `Next: ${episodeLabel([next])} · ${formatShortDate(next, now)}` : nextSeasonNote(show)}
-                      airing={data.airingSoon.has(show.tmdb_id)}
-                      padded
-                    />
-                  )
-                })}
-              </Section>
+              <div className="mt-6 px-5">
+                <Collapsible title="Caught up" subtitle="Nothing to watch until the next episode" count={data.caughtUp.length}>
+                  {data.caughtUp.map((show) => {
+                    const next = data.nextDate.get(show.tmdb_id)
+                    return (
+                      <QuietRow
+                        key={show.tmdb_id}
+                        show={show}
+                        detail={next ? `Next: ${episodeLabel([next])} · ${formatShortDate(next, now)}` : nextSeasonNote(show)}
+                        airing={data.airingSoon.has(show.tmdb_id)}
+                      />
+                    )
+                  })}
+                </Collapsible>
+              </div>
             )}
             {data.watchingCount === 0 && (
               <Notice>
@@ -249,7 +250,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-/** A closed-by-default drop-down for the less urgent groups at the bottom of On air. */
+/** A closed-by-default drop-down for the less urgent groups: Caught up, Save the Date, Still Cooking. */
 function Collapsible({ title, subtitle, count, children }: { title: string; subtitle: string; count: number; children: ReactNode }) {
   return (
     <details className="group rounded-xl bg-neutral-50 dark:bg-neutral-900">
@@ -272,14 +273,12 @@ function QuietRow({
   detail,
   progress,
   airing = false,
-  padded = false,
 }: {
   show: Show
   detail: string
   /** When given, adds a line saying how far behind you are. */
   progress?: Progress
   airing?: boolean
-  padded?: boolean
 }) {
   const behind = progress?.started && progress.left > 0
   const catchUp = progress && catchUpLine(progress)
@@ -287,7 +286,7 @@ function QuietRow({
     <li className="list-none">
       <button
         onClick={() => navigate(`/show/${show.tmdb_id}`)}
-        className={`flex w-full items-center gap-4 py-2 text-left active:bg-neutral-100 dark:active:bg-neutral-800 ${padded ? 'px-5' : 'px-4'}`}
+        className="flex w-full items-center gap-4 px-4 py-2 text-left active:bg-neutral-100 dark:active:bg-neutral-800"
       >
         <Poster path={show.poster_path} name={show.name} size="xs" />
         <div className="min-w-0 flex-1">
