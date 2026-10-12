@@ -30,6 +30,9 @@ export function parseRoute(hash: string): Route {
   return { name: 'tracking' }
 }
 
+/** A route without its show ID: "/show/[id]". */
+export const routePattern = (r: Route) => (r.name === 'show' || r.name === 'rank' ? `/${r.name}/[id]` : `/${r.name}`)
+
 export const isTab = (r: Route): r is { name: Tab } => r.name !== 'show' && r.name !== 'rank' && r.name !== 'compare'
 
 const depth = () => (history.state as { depth?: number } | null)?.depth ?? 0

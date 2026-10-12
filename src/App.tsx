@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { isTab, useRoute, type Tab } from './lib/router'
+import { Analytics } from '@vercel/analytics/react'
+import { isTab, routePattern, useRoute, type Tab } from './lib/router'
+import { screenOnlyUrl } from './lib/analytics'
 import { refreshFollowed } from './lib/shows'
 import { TabBar, Toast } from './components/Layout'
 import { Tracking } from './screens/Tracking'
@@ -44,6 +46,7 @@ export function App() {
   }, [])
 
   const Screen = SCREENS[tab]
+  const page = routePattern(route)
   return (
     <>
       <main className="mx-auto max-w-xl pb-[calc(4.5rem+env(safe-area-inset-bottom))]">
@@ -55,6 +58,8 @@ export function App() {
       {route.name === 'compare' && <KeepComparing />}
       <RatePrompt hidden={route.name === 'rank'} />
       <Toast />
+      {/* Page views per screen (no show IDs), production only. Served from this site, so the CSP needn't change. */}
+      {import.meta.env.PROD && <Analytics route={page} path={page} beforeSend={screenOnlyUrl} />}
     </>
   )
 }

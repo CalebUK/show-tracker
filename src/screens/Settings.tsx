@@ -194,6 +194,9 @@ export function Settings() {
             </a>{' '}
             (CC BY-SA). Streaming availability from JustWatch via TMDB.
           </p>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+            Anonymous visit counts (which screens get opened) go to Vercel Analytics. No cookies, and nothing about your shows.
+          </p>
         </Section>
       </div>
     </>
