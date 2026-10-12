@@ -21,7 +21,7 @@ For local development you can skip pasting by copying `.env.example` to `.env` a
 |---|---|
 | `npm run dev` | Dev server at http://localhost:5173 |
 | `npm run dev:lan` | Same, reachable from your phone on the same Wi-Fi (no install/offline: that needs HTTPS) |
-| `npm test` | Unit tests (ranking maths, binary insertion, date grouping, backup validation) |
+| `npm test` | Tests: the maths (Elo, dates, progress, backup checks) and the saved-data code (follow/unfollow, rankings, Keep comparing, rate prompt, backups, refresh, database upgrades) against an in-memory database |
 | `npm run build` | Type-check and build to `dist/` |
 | `npm run icons` | Regenerate the PNG icons from `public/logo.svg` |
 
@@ -81,3 +81,4 @@ A few choices the spec left open:
 - Unfollowing a show you've **ticked episodes of** keeps its record and episode list, so its history and time stay in Your stats.
 - Ticking the episode that **finishes** an unranked show offers to rate it.
 - **Keep comparing** (Rankings tab) serves endless random pairs of ranked shows. Each answer is saved immediately and moves both ratings (K = 24); Undo and Skip are there too.
+- **Backups don't include "Where to stream"**: it changes all the time, so it always comes fresh from TMDB (on each refresh of followed shows, and live on the show page for others). Older backups that contain it have it ignored.

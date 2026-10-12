@@ -19,7 +19,16 @@ export async function buildBackup(): Promise<File> {
     db.rankings.toArray(),
     db.watched.toArray(),
   ])
-  const backup: BackupFile = { app: 'show-tracker', version: 3, exported_at: new Date().toISOString(), shows, episodes, rankings, watched }
+  const backup = {
+    app: 'show-tracker',
+    version: 3,
+    exported_at: new Date().toISOString(),
+    // "Where to stream" changes all the time, so it isn't kept in backups; it always comes fresh from TMDB.
+    shows: shows.map(({ streaming, ...show }) => show),
+    episodes,
+    rankings,
+    watched,
+  }
   const d = new Date()
   const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   return new File([JSON.stringify(backup, null, 2)], `show-tracker-backup-${stamp}.json`, { type: 'application/json' })
@@ -90,7 +99,8 @@ export function parseBackup(text: string): BackupFile {
       overview: typeof s.overview === 'string' ? s.overview : '',
       status: typeof s.status === 'string' ? s.status : '',
       network: strOrNull(s.network),
-      streaming: Array.isArray(s.streaming) ? (s.streaming as Show['streaming']) : [],
+      // Ignored even if an older backup has it: it's re-fetched from TMDB after restoring.
+      streaming: [],
       first_air_year: strOrNull(s.first_air_year),
       followed: s.followed === true,
       followed_at: strOrNull(s.followed_at),
