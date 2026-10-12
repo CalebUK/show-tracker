@@ -150,37 +150,40 @@ export function Tracking() {
                 ))}
               </Section>
             )}
-            {data.notStarted.length > 0 && (
-              <Section title="Not started">
-                {data.notStarted.map((show) => {
-                  const next = data.nextDate.get(show.tmdb_id)
-                  return (
-                    <UpNextRow
-                      key={show.tmdb_id}
-                      show={show}
-                      progress={progress(show)}
-                      airing={data.airingSoon.has(show.tmdb_id)}
-                      emptyText={next ? `Starts ${formatShortDate(next, now)}` : nextSeasonNote(show)}
-                    />
-                  )
-                })}
-              </Section>
-            )}
-            {data.caughtUp.length > 0 && (
-              <div className="mt-6 px-5">
-                <Collapsible title="Caught up" subtitle="Nothing to watch until the next episode" count={data.caughtUp.length}>
-                  {data.caughtUp.map((show) => {
-                    const next = data.nextDate.get(show.tmdb_id)
-                    return (
-                      <QuietRow
-                        key={show.tmdb_id}
-                        show={show}
-                        detail={next ? `Next: ${episodeLabel([next])} · ${formatShortDate(next, now)}` : nextSeasonNote(show)}
-                        airing={data.airingSoon.has(show.tmdb_id)}
-                      />
-                    )
-                  })}
-                </Collapsible>
+            {(data.notStarted.length > 0 || data.caughtUp.length > 0) && (
+              <div className="mt-6 space-y-2 px-5">
+                {data.notStarted.length > 0 && (
+                  <Collapsible title="Not started" subtitle="Following, nothing watched yet" count={data.notStarted.length}>
+                    {data.notStarted.map((show) => {
+                      const next = data.nextDate.get(show.tmdb_id)
+                      return (
+                        <UpNextRow
+                          key={show.tmdb_id}
+                          show={show}
+                          progress={progress(show)}
+                          airing={data.airingSoon.has(show.tmdb_id)}
+                          emptyText={next ? `Starts ${formatShortDate(next, now)}` : nextSeasonNote(show)}
+                          inPanel
+                        />
+                      )
+                    })}
+                  </Collapsible>
+                )}
+                {data.caughtUp.length > 0 && (
+                  <Collapsible title="Caught up" subtitle="Nothing to watch until the next episode" count={data.caughtUp.length}>
+                    {data.caughtUp.map((show) => {
+                      const next = data.nextDate.get(show.tmdb_id)
+                      return (
+                        <QuietRow
+                          key={show.tmdb_id}
+                          show={show}
+                          detail={next ? `Next: ${episodeLabel([next])} · ${formatShortDate(next, now)}` : nextSeasonNote(show)}
+                          airing={data.airingSoon.has(show.tmdb_id)}
+                        />
+                      )
+                    })}
+                  </Collapsible>
+                )}
               </div>
             )}
             {data.watchingCount === 0 && (
@@ -250,7 +253,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-/** A closed-by-default drop-down for the less urgent groups: Caught up, Save the Date, Still Cooking. */
+/** A closed-by-default drop-down for the less urgent groups: Not started, Caught up, Save the Date, Still Cooking. */
 function Collapsible({ title, subtitle, count, children }: { title: string; subtitle: string; count: number; children: ReactNode }) {
   return (
     <details className="group rounded-xl bg-neutral-50 dark:bg-neutral-900">
@@ -348,20 +351,25 @@ function UpNextRow({
   progress,
   airing = false,
   emptyText = 'No episode list yet',
+  inPanel = false,
 }: {
   show: Show
   progress: Progress
   airing?: boolean
   /** What to say when there's no episode to watch yet (e.g. "Starts Thu 23 Oct"). */
   emptyText?: string
+  /** Inside a drop-down panel: tighter edges to match its other rows. */
+  inPanel?: boolean
 }) {
   const ep = progress.next
   const left = ep && progress.started ? `${progress.left} left` : null
   return (
-    <li className="flex items-center gap-2 pr-4">
+    <li className={`flex items-center gap-2 ${inPanel ? 'pr-2' : 'pr-4'}`}>
       <button
         onClick={() => navigate(`/show/${show.tmdb_id}`)}
-        className="flex min-w-0 flex-1 items-center gap-4 py-2.5 pl-5 text-left active:bg-neutral-50 dark:active:bg-neutral-900"
+        className={`flex min-w-0 flex-1 items-center gap-4 py-2.5 text-left ${
+          inPanel ? 'pl-4 active:bg-neutral-100 dark:active:bg-neutral-800' : 'pl-5 active:bg-neutral-50 dark:active:bg-neutral-900'
+        }`}
       >
         <Poster path={show.poster_path} name={show.name} size="sm" />
         <div className="min-w-0 flex-1">

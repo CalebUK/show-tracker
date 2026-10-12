@@ -65,18 +65,18 @@ export function Overlay({ title, children, fallback = '/' }: { title?: string; c
   )
 }
 
-/** A row of filter chips, used under screen titles. */
+/** A row of filter chips, used under screen titles. Wraps rather than scrolling sideways. `value` null = none selected. */
 export function Chips<T extends string>({
   options,
   value,
   onChange,
 }: {
   options: { id: T; label: string; count?: number }[]
-  value: T
+  value: T | null
   onChange: (id: T) => void
 }) {
   return (
-    <div className="flex gap-2 overflow-x-auto px-5 pb-3">
+    <div className="flex flex-wrap gap-2 px-5 pb-3">
       {options.map((o) => (
         <button
           key={o.id}

@@ -10,55 +10,31 @@ import { Button, Chips, EmptyState, ScreenHeader } from '../components/Layout'
 import { Poster } from '../components/Poster'
 import { PlusIcon } from '../components/Icons'
 
-type Filter = 'following' | 'stream' | 'notStarted' | 'finished'
+type Filter = 'stream' | 'notStarted' | 'finished'
 
-// Kept outside the component so switching tabs doesn't reset the filter.
-let lastFilter: Filter = 'following'
+// Kept outside the component so switching tabs doesn't reset the filter. null = everything.
+let lastFilter: Filter | null = null
 
-const HIDE_KEY = 'shows.hideCaughtUp'
-function loadHide() {
-  try {
-    return localStorage.getItem(HIDE_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-function saveHide(value: boolean) {
-  try {
-    localStorage.setItem(HIDE_KEY, value ? '1' : '0')
-  } catch {
-    // Private mode or blocked storage: the setting just won't stick.
-  }
-}
-
-/** Every show you follow (or own), A–Z, with where you're up to. */
+/** Every show you follow, A–Z, with where you're up to. The filters narrow it down. */
 export function Shows() {
   const now = useNow()
   const library = useLibrary(now)
   const myServices = myServicesStore.use()
-  const [filter, setFilterState] = useState<Filter>(lastFilter)
-  const setFilter = (f: Filter) => setFilterState((lastFilter = f))
-  const [hideCaughtUp, setHideState] = useState(loadHide)
-  const setHide = (v: boolean) => {
-    saveHide(v)
-    setHideState(v)
-  }
+  const [filter, setFilterState] = useState<Filter | null>(lastFilter)
+  // Tapping the selected filter again goes back to everything.
+  const setFilter = (f: Filter) => setFilterState((lastFilter = f === filter ? null : f))
 
   const progress = (s: Show) => library!.progress.get(s.tmdb_id)!
   const finished = (s: Show) => isFinished(s, progress(s))
-  const following = library?.followed.filter((s) => !finished(s)) ?? []
+  const all = library?.followed ?? []
   const lists = library && {
-    // Finished shows (ended and fully watched) move out of the main list into their own.
-    following,
     // On one of your services (Settings → Streaming services), or owned on DVD or streaming.
-    stream: following.filter((s) => canStream(s, myServices)),
-    notStarted: library.followed.filter((s) => !s.stopped && !progress(s).started),
-    finished: library.followed.filter(finished),
+    stream: all.filter((s) => canStream(s, myServices)),
+    notStarted: all.filter((s) => !s.stopped && !progress(s).started),
+    finished: all.filter(finished),
   }
-  const hasAny = (library?.followed.length ?? 0) > 0
-  const canHide = filter === 'following' || filter === 'stream'
-  const shows = (lists?.[filter] ?? []).filter((s) => !(canHide && hideCaughtUp && progress(s).caughtUp))
-  const hiddenCount = (lists?.[filter].length ?? 0) - shows.length
+  const hasAny = all.length > 0
+  const shows = filter ? (lists?.[filter] ?? []) : all
 
   return (
     <>
@@ -78,28 +54,19 @@ export function Shows() {
       >
         {hasAny && lists && (
           <>
+            {/* No counts on the chips so all three fit on one line; the count sits on the row below. */}
             <Chips
               options={[
-                { id: 'following', label: 'Following', count: lists.following.length },
-                { id: 'stream', label: 'Able to stream', count: lists.stream.length },
-                { id: 'notStarted', label: 'Not started', count: lists.notStarted.length },
-                { id: 'finished', label: 'Finished', count: lists.finished.length },
+                { id: 'stream', label: 'Able to stream' },
+                { id: 'notStarted', label: 'Not started' },
+                { id: 'finished', label: 'Finished' },
               ]}
               value={filter}
               onChange={setFilter}
             />
-            {canHide && (
-              <label className="flex cursor-pointer items-center gap-2 px-5 pb-3 text-sm text-neutral-600 dark:text-neutral-300">
-                <input
-                  type="checkbox"
-                  checked={hideCaughtUp}
-                  onChange={(e) => setHide(e.target.checked)}
-                  className="h-4 w-4 cursor-pointer accent-accent"
-                />
-                Hide caught up
-                {hideCaughtUp && hiddenCount > 0 && <span className="text-neutral-400">({hiddenCount} hidden)</span>}
-              </label>
-            )}
+            <p className="px-5 pb-3 text-sm text-neutral-400 tabular-nums">
+              {shows.length} show{shows.length === 1 ? '' : 's'}
+            </p>
           </>
         )}
       </ScreenHeader>
@@ -113,13 +80,15 @@ export function Shows() {
       ) : lists && shows.length === 0 ? (
         <div className="px-5 pt-8">
           <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-            {filter === 'stream' && hiddenCount === 0
+            {filter === 'stream'
               ? myServices.length === 0
                 ? 'Tick the streaming services you have in Settings, and the shows you follow that are on them will appear here, along with any you own on DVD or streaming.'
                 : "None of the shows you follow are on your streaming services right now, and you haven't marked any as owned."
-              : emptyMessage(filter, hiddenCount, lists.finished.length)}
+              : filter === 'finished'
+                ? "Shows that have ended and you've watched every episode of will appear here."
+                : "You've started everything you follow."}
           </p>
-          {filter === 'stream' && hiddenCount === 0 && (
+          {filter === 'stream' && (
             <Button variant="secondary" className="mt-4" onClick={() => navigate('/settings', { replace: true })}>
               Choose your services
             </Button>
@@ -146,7 +115,7 @@ export function Shows() {
                 <div className="min-w-0 flex-1">
                   <div className="line-clamp-2 text-[15px] leading-snug font-medium [overflow-wrap:anywhere]">{show.name}</div>
                   <div className="truncate text-sm text-neutral-500 dark:text-neutral-400">
-                    {filter === 'finished'
+                    {finished(show)
                       ? finishedLine(show, progress(show))
                       : statusLine(show, progress(show), library!.nextUp.get(show.tmdb_id), now)}
                   </div>
@@ -159,14 +128,6 @@ export function Shows() {
       )}
     </>
   )
-}
-
-function emptyMessage(filter: Filter, hidden: number, finishedCount: number) {
-  if (hidden > 0) return "You're caught up on everything here. Untick Hide caught up to see them."
-  if (filter === 'finished') return "Shows that have ended and you've watched every episode of will move here."
-  if (filter === 'notStarted') return "You've started everything you follow."
-  if (finishedCount > 0) return "You've finished everything you follow. They're under Finished."
-  return "You're not following anything. Follow shows from Search to see them here."
 }
 
 /** Where you're up to, plus what's next on the schedule (or TMDB's news if nothing is). */
