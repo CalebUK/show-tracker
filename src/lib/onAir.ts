@@ -4,7 +4,7 @@ import { createStore } from './store'
 
 /**
  * Which shows appear under Tracking → On air (Settings → On air):
- * every show, or only ones you're caught up on (so season 3's premiere doesn't show while
+ * every show, or only ones you're on the current season of (so season 3 doesn't show while
  * you're still on season 1). Stored per phone; not part of backups.
  */
 export type OnAirFilter = 'all' | 'caughtUp'
@@ -22,7 +22,10 @@ export async function setOnAirFilter(value: OnAirFilter) {
 }
 
 /**
- * Caught up for On air purposes: nothing that aired before today is left to watch. An episode
- * airing today doesn't count against you, so a show you watch live stays put on the day.
+ * Up to the current season, for On air purposes: your next episode is in the season that's
+ * airing (or the latest one), so being a few episodes behind is fine but a whole season isn't.
+ * The current season goes by episodes aired before today, so a premiere doesn't make a show
+ * vanish on the day.
  */
-export const isCaughtUpForOnAir = (progress: Progress, todayIso: string) => !progress.next || progress.next.airstamp >= todayIso
+export const isOnCurrentSeason = ({ next, currentSeason }: Progress) =>
+  !next || currentSeason == null || next.season >= currentSeason

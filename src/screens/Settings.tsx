@@ -332,14 +332,15 @@ function OnAirSection() {
   return (
     <Section title="On air">
       <p className="text-sm text-neutral-500 dark:text-neutral-400">
-        Which shows appear under Tracking → On air. With Caught up only, a show you're behind on (say, still on season 1)
-        won't show its upcoming episodes until you catch up.
+        Which shows appear under Tracking → On air. With Current season, a show appears once you've reached the season
+        that's airing: a few episodes behind is fine, but if you're still on season 2 while season 3 airs, it waits until
+        you catch up.
       </p>
       <Segmented
         label="On air shows"
         options={[
           { id: 'all', label: 'All shows' },
-          { id: 'caughtUp', label: 'Caught up only' },
+          { id: 'caughtUp', label: 'Current season' },
         ]}
         value={filter}
         onChange={setOnAirFilter}

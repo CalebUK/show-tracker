@@ -1,5 +1,5 @@
 import { episodeKey, type Episode, type Show, type Watched } from '../db'
-import { formatDateOnly } from './dates'
+import { formatDateOnly, startOfDay } from './dates'
 import { isOngoing } from './tmdb'
 
 /** Season, then episode number. Specials without a number go last in their season. */
@@ -27,6 +27,11 @@ export interface Progress {
   minutesWatched: number | null
   /** Total runtime of the episodes still to watch (`left`), in minutes. */
   minutesLeft: number | null
+  /**
+   * Highest season with an episode aired before today: the season that's airing, or the latest
+   * one between seasons. null when nothing has aired yet.
+   */
+  currentSeason: number | null
 }
 
 /**
@@ -45,6 +50,11 @@ export function progressFor(episodes: Episode[], watched: Watched[], now = new D
   const remaining = aired.slice(furthest + 1)
   const started = watched.length > 0
   const minutes = runtimeTotal(episodes)
+  const todayStart = startOfDay(now).getTime()
+  const currentSeason = aired.reduce<number | null>(
+    (max, e) => (Date.parse(e.airstamp) < todayStart ? Math.max(max ?? 0, e.season) : max),
+    null,
+  )
   return {
     aired: aired.length,
     watched: aired.filter(isSeen).length,
@@ -55,6 +65,7 @@ export function progressFor(episodes: Episode[], watched: Watched[], now = new D
     lastWatchedAt: watched.reduce<string | null>((max, w) => (!max || w.watched_at > max ? w.watched_at : max), null),
     minutesWatched: minutes(aired.filter(isSeen)),
     minutesLeft: minutes(remaining),
+    currentSeason,
   }
 }
 

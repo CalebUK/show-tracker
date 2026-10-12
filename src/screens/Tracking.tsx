@@ -5,7 +5,7 @@ import { isAired, isFinished, isInProduction, nextSeasonNote, type Progress } fr
 import { refreshFollowed, refreshStore } from '../lib/shows'
 import { setWatched } from '../lib/watched'
 import { getTmdbKey } from '../lib/tmdb'
-import { isCaughtUpForOnAir, onAirFilterStore } from '../lib/onAir'
+import { isOnCurrentSeason, onAirFilterStore } from '../lib/onAir'
 import { navigate } from '../lib/router'
 import { errorMessage, toast } from '../lib/toast'
 import { isWatched, useLibrary } from '../hooks/useLibrary'
@@ -49,7 +49,6 @@ export function Tracking() {
     // Shows marked "Stopped watching" stay followed but never appear here.
     const followed = library.followed.filter((s) => !s.stopped)
     const p = (s: Show) => progress.get(s.tmdb_id)!
-    const todayIso = startOfDay(now).toISOString()
     const soonIso = addMonths(startOfDay(now), SOON_MONTHS).toISOString()
 
     // Episodes you've ticked drop off the schedule.
@@ -68,8 +67,8 @@ export function Tracking() {
     const notStarted = active.filter((s) => !p(s).started)
     const caughtUp = active.filter((s) => p(s).caughtUp)
 
-    // On air: the schedule. With "Caught up only", shows you're behind on wait until you catch up.
-    const onAir = onAirFilter === 'all' ? followed : followed.filter((s) => isCaughtUpForOnAir(p(s), todayIso))
+    // On air: the schedule. With "Current season", shows you're a season behind on wait until you catch up.
+    const onAir = onAirFilter === 'all' ? followed : followed.filter((s) => isOnCurrentSeason(p(s)))
     const onAirIds = new Set(onAir.map((s) => s.tmdb_id))
     const onAirSoon = soon.filter((e) => onAirIds.has(e.tmdb_show_id))
     const isFarAway = (s: Show) => !airingSoon.has(s.tmdb_id) && nextDate.has(s.tmdb_id)
@@ -202,8 +201,8 @@ export function Tracking() {
             {nothingOnAir && <Notice>Nothing in the next {SOON_MONTHS} months for the shows here.</Notice>}
             {data.hiddenFromOnAir > 0 && (
               <p className="px-5 pt-4 text-xs leading-relaxed text-neutral-400">
-                {data.hiddenFromOnAir} show{data.hiddenFromOnAir === 1 ? '' : 's'} you're behind on{' '}
-                {data.hiddenFromOnAir === 1 ? 'is' : 'are'} hidden until you catch up. Change this in Settings → On air.
+                {data.hiddenFromOnAir} show{data.hiddenFromOnAir === 1 ? '' : 's'} you're a season or more behind on{' '}
+                {data.hiddenFromOnAir === 1 ? 'is' : 'are'} hidden until you reach the current season. Change this in Settings → On air.
               </p>
             )}
 
