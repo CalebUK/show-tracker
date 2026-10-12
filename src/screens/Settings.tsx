@@ -25,6 +25,7 @@ import { Button, ScreenHeader } from '../components/Layout'
 import { ChevronIcon, CoffeeIcon } from '../components/Icons'
 import { setThemePref, themeStore, type ThemePref } from '../lib/theme'
 import { questionsStore, setQuestionSetting } from '../lib/ranking'
+import { onAirFilterStore, setOnAirFilter } from '../lib/onAir'
 import { QUESTION_OPTIONS } from '../lib/elo'
 import { TmdbKeyForm, TmdbKeyHelp } from '../components/TmdbKeyForm'
 
@@ -153,6 +154,7 @@ export function Settings() {
 
         <TmdbKeySection />
         <RegionSection />
+        <OnAirSection />
         <RankingSection />
         <AppearanceSection />
         <InstallSection />
@@ -321,6 +323,28 @@ function RegionSection() {
           </option>
         ))}
       </select>
+    </Section>
+  )
+}
+
+function OnAirSection() {
+  const filter = onAirFilterStore.use()
+  return (
+    <Section title="On air">
+      <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        Which shows appear under Tracking → On air. With Caught up only, a show you're behind on (say, still on season 1)
+        won't show its upcoming episodes until you catch up.
+      </p>
+      <Segmented
+        label="On air shows"
+        options={[
+          { id: 'all', label: 'All shows' },
+          { id: 'caughtUp', label: 'Caught up only' },
+        ]}
+        value={filter}
+        onChange={setOnAirFilter}
+        className="mt-3"
+      />
     </Section>
   )
 }

@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { Episode, Show } from '../db'
-import { addMonths, episodeLabel, formatAirTime, groupUpcoming, startOfDay, type UpcomingGroups, type UpcomingRow } from '../lib/dates'
+import { addMonths, episodeLabel, formatAirTime, formatShortDate, groupUpcoming, startOfDay, type UpcomingGroups, type UpcomingRow } from '../lib/dates'
 import { isAired, isFinished, isInProduction, nextSeasonNote, type Progress } from '../lib/progress'
 import { refreshFollowed, refreshStore } from '../lib/shows'
 import { setWatched } from '../lib/watched'
 import { getTmdbKey } from '../lib/tmdb'
+import { isCaughtUpForOnAir, onAirFilterStore } from '../lib/onAir'
 import { navigate } from '../lib/router'
 import { errorMessage, toast } from '../lib/toast'
 import { isWatched, useLibrary } from '../hooks/useLibrary'
@@ -21,23 +22,24 @@ const SECTIONS: { id: keyof UpcomingGroups; title: string }[] = [
   { id: 'later', title: 'Later' },
 ]
 
-type View = 'on' | 'streaming'
+type View = 'watching' | 'onair'
 const VIEWS: { id: View; label: string }[] = [
-  { id: 'on', label: 'On air' },
-  { id: 'streaming', label: 'Streaming' },
+  { id: 'watching', label: 'Watching' },
+  { id: 'onair', label: 'On air' },
 ]
 
-/** Further out than this, a show's next date goes in the "More than 3 months away" section. */
+/** Further out than this, a show's next date goes in the "Save the Date" section. */
 const SOON_MONTHS = 3
 
 // Kept outside the component so switching tabs doesn't reset it.
-let lastView: View = 'on'
+let lastView: View = 'watching'
 
-export function Watching() {
+export function Tracking() {
   const now = useNow()
   const online = useOnline()
   const refresh = refreshStore.use()
   const library = useLibrary(now)
+  const onAirFilter = onAirFilterStore.use()
   const [view, setViewState] = useState<View>(lastView)
   const setView = (v: View) => setViewState((lastView = v))
 
@@ -54,42 +56,40 @@ export function Watching() {
     const unwatched = upcoming.filter((e) => !isWatched(library, e))
     const nextDate = new Map<number, Episode>()
     for (const ep of unwatched) if (!nextDate.has(ep.tmdb_show_id)) nextDate.set(ep.tmdb_show_id, ep)
-
     const soon = unwatched.filter((e) => e.airstamp < soonIso)
     const airingSoon = new Set(soon.map((e) => e.tmdb_show_id))
+
+    // Watching: every show you're tracking, by where you're up to, airing or not.
+    // Finished shows live under Shows → Finished instead.
+    const active = followed.filter((s) => !isFinished(s, p(s)))
+    const upNext = active
+      .filter((s) => p(s).started && p(s).next)
+      .sort((a, b) => (p(b).lastWatchedAt ?? '').localeCompare(p(a).lastWatchedAt ?? ''))
+    const notStarted = active.filter((s) => !p(s).started)
+    const caughtUp = active.filter((s) => p(s).caughtUp)
+
+    // On air: the schedule. With "Caught up only", shows you're behind on wait until you catch up.
+    const onAir = onAirFilter === 'all' ? followed : followed.filter((s) => isCaughtUpForOnAir(p(s), todayIso))
+    const onAirIds = new Set(onAir.map((s) => s.tmdb_id))
+    const onAirSoon = soon.filter((e) => onAirIds.has(e.tmdb_show_id))
     const isFarAway = (s: Show) => !airingSoon.has(s.tmdb_id) && nextDate.has(s.tmdb_id)
     const isUndated = (s: Show) => !nextDate.has(s.tmdb_id) && isInProduction(s)
-
-    // Streaming: what you're working through at your own pace, airing or not (e.g. season 1 while
-    // season 2 airs). Finished shows live under Shows → Finished instead.
-    const active = followed.filter((s) => !isFinished(s, p(s)))
-    // An episode that aired today is already listed under On air → Today.
-    const nextAiredToday = (s: Show) => !!p(s).next && p(s).next!.airstamp >= todayIso
-    // Shows in On air's Save the Date / Still Cooking sections, or on the schedule.
-    const hasNews = (s: Show) => isFarAway(s) || isUndated(s)
-    const upNext = active
-      .filter((s) => p(s).started && p(s).next && !nextAiredToday(s))
-      .sort((a, b) => (p(b).lastWatchedAt ?? '').localeCompare(p(a).lastWatchedAt ?? ''))
-    const notStarted = active.filter(
-      (s) => !p(s).started && (p(s).next ? !nextAiredToday(s) : !airingSoon.has(s.tmdb_id) && !hasNews(s)),
-    )
-    const caughtUp = active.filter((s) => p(s).caughtUp && !airingSoon.has(s.tmdb_id) && !hasNews(s))
+    const hasDate = (s: Show) => nextDate.has(s.tmdb_id) || isInProduction(s)
 
     return {
-      // On air: the schedule.
-      groups: groupUpcoming(soon, new Map(followed.map((s) => [s.tmdb_id, s])), now),
-      farAway: followed.filter(isFarAway).sort((a, b) => nextDate.get(a.tmdb_id)!.airstamp.localeCompare(nextDate.get(b.tmdb_id)!.airstamp)),
-      undated: followed.filter(isUndated),
+      groups: groupUpcoming(onAirSoon, new Map(onAir.map((s) => [s.tmdb_id, s])), now),
+      farAway: onAir.filter(isFarAway).sort((a, b) => nextDate.get(a.tmdb_id)!.airstamp.localeCompare(nextDate.get(b.tmdb_id)!.airstamp)),
+      undated: onAir.filter(isUndated),
+      hiddenFromOnAir: followed.filter((s) => !onAirIds.has(s.tmdb_id) && hasDate(s)).length,
       nextDate,
-      // Streaming
       upNext,
       notStarted,
       caughtUp,
       airingSoon,
-      streamingCount: upNext.length + notStarted.length + caughtUp.length,
+      watchingCount: active.length,
       finishedCount: followed.length - active.length,
     }
-  }, [library, now])
+  }, [library, now, onAirFilter])
 
   const forceRefresh = useCallback(async () => {
     if (!navigator.onLine) {
@@ -112,7 +112,7 @@ export function Watching() {
   return (
     <>
       <ScreenHeader
-        title="Watching"
+        title="Tracking"
         right={
           hasShows ? (
             <button
@@ -139,7 +139,56 @@ export function Watching() {
             body="Search for a show and follow it to see its next episodes here."
             action={<Button onClick={() => navigate('/search', { replace: true })}>Find a show</Button>}
           />
-        ) : !data ? null : view === 'on' ? (
+        ) : !data ? null : view === 'watching' ? (
+          <div className="pb-6">
+            {data.upNext.length > 0 && (
+              <Section title="Up next">
+                {data.upNext.map((show) => (
+                  <UpNextRow key={show.tmdb_id} show={show} progress={progress(show)} airing={data.airingSoon.has(show.tmdb_id)} />
+                ))}
+              </Section>
+            )}
+            {data.notStarted.length > 0 && (
+              <Section title="Not started">
+                {data.notStarted.map((show) => {
+                  const next = data.nextDate.get(show.tmdb_id)
+                  return (
+                    <UpNextRow
+                      key={show.tmdb_id}
+                      show={show}
+                      progress={progress(show)}
+                      airing={data.airingSoon.has(show.tmdb_id)}
+                      emptyText={next ? `Starts ${formatShortDate(next, now)}` : nextSeasonNote(show)}
+                    />
+                  )
+                })}
+              </Section>
+            )}
+            {data.caughtUp.length > 0 && (
+              <Section title="Caught up">
+                {data.caughtUp.map((show) => {
+                  const next = data.nextDate.get(show.tmdb_id)
+                  return (
+                    <QuietRow
+                      key={show.tmdb_id}
+                      show={show}
+                      detail={next ? `Next: ${episodeLabel([next])} · ${formatShortDate(next, now)}` : nextSeasonNote(show)}
+                      airing={data.airingSoon.has(show.tmdb_id)}
+                      padded
+                    />
+                  )
+                })}
+              </Section>
+            )}
+            {data.watchingCount === 0 && (
+              <Notice>
+                {data.finishedCount > 0
+                  ? "Nothing to watch right now. Shows you've finished are in the Shows tab under Finished."
+                  : 'Shows you follow appear here with your next episode to watch.'}
+              </Notice>
+            )}
+          </div>
+        ) : (
           <div className="pb-6">
             {SECTIONS.map(({ id, title }) =>
               data.groups[id].length ? (
@@ -150,11 +199,12 @@ export function Watching() {
                 </Section>
               ) : null,
             )}
-            {nothingOnAir && (
-              <Notice>
-                Nothing in the next {SOON_MONTHS} months for the shows you follow.
-                {data.streamingCount > 0 && ' Streaming has your next episodes to watch.'}
-              </Notice>
+            {nothingOnAir && <Notice>Nothing in the next {SOON_MONTHS} months for the shows here.</Notice>}
+            {data.hiddenFromOnAir > 0 && (
+              <p className="px-5 pt-4 text-xs leading-relaxed text-neutral-400">
+                {data.hiddenFromOnAir} show{data.hiddenFromOnAir === 1 ? '' : 's'} you're behind on{' '}
+                {data.hiddenFromOnAir === 1 ? 'is' : 'are'} hidden until you catch up. Change this in Settings → On air.
+              </p>
             )}
 
             <div className="mt-8 space-y-2 px-5">
@@ -181,37 +231,6 @@ export function Watching() {
                 </Collapsible>
               )}
             </div>
-          </div>
-        ) : (
-          <div className="pb-6">
-            {data.upNext.length > 0 && (
-              <Section title="Up next">
-                {data.upNext.map((show) => (
-                  <UpNextRow key={show.tmdb_id} show={show} progress={progress(show)} airing={data.airingSoon.has(show.tmdb_id)} />
-                ))}
-              </Section>
-            )}
-            {data.notStarted.length > 0 && (
-              <Section title="Not started">
-                {data.notStarted.map((show) => (
-                  <UpNextRow key={show.tmdb_id} show={show} progress={progress(show)} airing={data.airingSoon.has(show.tmdb_id)} />
-                ))}
-              </Section>
-            )}
-            {data.caughtUp.length > 0 && (
-              <Section title="Caught up">
-                {data.caughtUp.map((show) => (
-                  <QuietRow key={show.tmdb_id} show={show} detail={nextSeasonNote(show)} padded />
-                ))}
-              </Section>
-            )}
-            {data.streamingCount === 0 && (
-              <Notice>
-                {data.finishedCount > 0
-                  ? "Nothing to catch up on. Shows you've finished are in the Shows tab under Finished."
-                  : "Nothing to catch up on. Shows you're working through appear here with your next episode to watch."}
-              </Notice>
-            )}
           </div>
         )}
       </PullToRefresh>
@@ -250,12 +269,14 @@ function QuietRow({
   show,
   detail,
   progress,
+  airing = false,
   padded = false,
 }: {
   show: Show
   detail: string
   /** When given, adds a line saying how far behind you are. */
   progress?: Progress
+  airing?: boolean
   padded?: boolean
 }) {
   const behind = progress?.started && progress.left > 0
@@ -268,10 +289,13 @@ function QuietRow({
       >
         <Poster path={show.poster_path} name={show.name} size="xs" />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[15px] text-neutral-700 dark:text-neutral-200">{show.name}</div>
+          <ShowName name={show.name} className="text-neutral-700 dark:text-neutral-200" />
           <div className="truncate text-sm text-neutral-500 tabular-nums dark:text-neutral-400">{detail}</div>
-          {catchUp && (
-            <div className={`text-xs tabular-nums ${behind ? 'font-medium text-accent-text' : 'text-neutral-400'}`}>{catchUp}</div>
+          {(catchUp || airing) && (
+            <div className="mt-0.5 flex items-center gap-2 text-xs tabular-nums">
+              {airing && <AiringPill />}
+              {catchUp && <span className={behind ? 'font-medium text-accent-text' : 'text-neutral-400'}>{catchUp}</span>}
+            </div>
           )}
         </div>
       </button>
@@ -302,7 +326,7 @@ function EpisodeRow({ row, group, now }: { row: UpcomingRow; group: keyof Upcomi
       >
         <Poster path={row.show.poster_path} name={row.show.name} size="sm" />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[15px] font-medium">{row.show.name}</div>
+          <ShowName name={row.show.name} className="font-medium" />
           <div className="truncate text-sm text-neutral-500 dark:text-neutral-400">
             <span className="tabular-nums">{episodeLabel(row.episodes)}</span>
             {title ? ` · ${title}` : ''}
@@ -318,8 +342,20 @@ function EpisodeRow({ row, group, now }: { row: UpcomingRow; group: keyof Upcomi
 }
 
 /** Your next unwatched episode of a show, with a tick to mark it and move on. */
-function UpNextRow({ show, progress, airing = false }: { show: Show; progress: Progress; airing?: boolean }) {
+function UpNextRow({
+  show,
+  progress,
+  airing = false,
+  emptyText = 'No episode list yet',
+}: {
+  show: Show
+  progress: Progress
+  airing?: boolean
+  /** What to say when there's no episode to watch yet (e.g. "Starts Thu 23 Oct"). */
+  emptyText?: string
+}) {
   const ep = progress.next
+  const left = ep && progress.started ? `${progress.left} left` : null
   return (
     <li className="flex items-center gap-2 pr-4">
       <button
@@ -328,14 +364,7 @@ function UpNextRow({ show, progress, airing = false }: { show: Show; progress: P
       >
         <Poster path={show.poster_path} name={show.name} size="sm" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-[15px] font-medium">{show.name}</span>
-            {airing && (
-              <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent-text dark:bg-accent/20">
-                Still airing
-              </span>
-            )}
-          </div>
+          <ShowName name={show.name} className="font-medium" />
           <div className="truncate text-sm text-neutral-500 dark:text-neutral-400">
             {ep ? (
               <>
@@ -343,14 +372,32 @@ function UpNextRow({ show, progress, airing = false }: { show: Show; progress: P
                 {ep.name ? ` · ${ep.name}` : ''}
               </>
             ) : (
-              'No episode list yet'
+              emptyText
             )}
           </div>
-          {ep && progress.started && <div className="text-xs text-neutral-400">{progress.left} left</div>}
+          {(airing || left) && (
+            <div className="mt-0.5 flex items-center gap-2 text-xs text-neutral-400">
+              {airing && <AiringPill />}
+              {left}
+            </div>
+          )}
         </div>
       </button>
       {ep && <TickButton episodes={[ep]} showName={show.name} />}
     </li>
+  )
+}
+
+/** Long titles get two lines rather than being cut off after a few words. */
+function ShowName({ name, className = '' }: { name: string; className?: string }) {
+  return <div className={`line-clamp-2 text-[15px] leading-snug [overflow-wrap:anywhere] ${className}`}>{name}</div>
+}
+
+function AiringPill() {
+  return (
+    <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent-text dark:bg-accent/20">
+      Still airing
+    </span>
   )
 }
 

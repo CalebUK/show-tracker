@@ -58,7 +58,7 @@ export function Rankings() {
                 <span className="w-10 shrink-0 text-lg font-semibold text-accent-text tabular-nums">{ranking.score.toFixed(1)}</span>
                 <Poster path={show?.poster_path} name={show?.name ?? '?'} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[15px] font-medium">{show?.name ?? 'Unknown show'}</div>
+                  <div className="line-clamp-2 text-[15px] leading-snug font-medium [overflow-wrap:anywhere]">{show?.name ?? 'Unknown show'}</div>
                   {show?.first_air_year && <div className="text-sm text-neutral-500 dark:text-neutral-400">{show.first_air_year}</div>}
                 </div>
               </button>

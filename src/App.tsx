@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { isTab, useRoute, type Tab } from './lib/router'
 import { refreshFollowed } from './lib/shows'
 import { TabBar, Toast } from './components/Layout'
-import { Watching } from './screens/Watching'
+import { Tracking } from './screens/Tracking'
 import { Shows } from './screens/Shows'
 import { Rankings } from './screens/Rankings'
 import { Search } from './screens/Search'
@@ -13,7 +13,7 @@ import { KeepComparing } from './screens/KeepComparing'
 import { RatePrompt } from './components/RatePrompt'
 
 const SCREENS: Record<Tab, () => React.JSX.Element> = {
-  watching: Watching,
+  tracking: Tracking,
   shows: Shows,
   rankings: Rankings,
   search: Search,
@@ -23,7 +23,7 @@ const SCREENS: Record<Tab, () => React.JSX.Element> = {
 export function App() {
   const route = useRoute()
   // Detail and ranking screens open on top of whichever tab you came from.
-  const [lastTab, setLastTab] = useState<Tab>(isTab(route) ? route.name : 'watching')
+  const [lastTab, setLastTab] = useState<Tab>(isTab(route) ? route.name : 'tracking')
   const tab = isTab(route) ? route.name : lastTab
   useEffect(() => {
     setLastTab(tab)

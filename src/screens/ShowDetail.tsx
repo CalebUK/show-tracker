@@ -109,7 +109,7 @@ export function ShowDetail({ id }: { id: number }) {
   const toggleStopped = async (value: boolean) => {
     try {
       await setStopped(id, value)
-      toast(value ? `${show.name} is hidden from Watching` : `${show.name} is back on Watching`)
+      toast(value ? `${show.name} is hidden from Tracking` : `${show.name} is back on Tracking`)
     } catch (err) {
       toast(errorMessage(err))
     }
@@ -132,10 +132,11 @@ export function ShowDetail({ id }: { id: number }) {
     <Overlay>
       <div className="px-5 pt-2 pb-10">
         {/* Everything at a glance beside the poster: title, details, score, progress and the main actions. */}
-        <div className="flex gap-4">
+        {/* items-start: the poster keeps its shape however tall a long title makes the column. */}
+        <div className="flex items-start gap-4">
           <Poster path={show.poster_path} name={show.name} size="lg" />
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl leading-tight font-semibold tracking-tight">{show.name}</h1>
+            <h1 className={`${titleSize(show.name)} leading-tight font-semibold tracking-tight [overflow-wrap:anywhere]`}>{show.name}</h1>
             {meta && <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{meta}</p>}
             {ranking && (
               <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
@@ -223,7 +224,7 @@ export function ShowDetail({ id }: { id: number }) {
             <div className="mt-2">
               <OwnToggle label="Stopped watching" checked={stored.stopped === true} onChange={toggleStopped} />
             </div>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">Keeps it in Shows and Rankings, but hides it from Watching.</p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">Keeps it in Shows and Rankings, but hides it from Tracking.</p>
           </section>
         )}
 
@@ -369,4 +370,11 @@ function ToggleChip({ label, pressed, onChange }: { label: string; pressed: bool
       {label}
     </button>
   )
+}
+
+/** Long titles step down a size so they don't tower over the poster ("The Lord of the Rings: The Rings of Power"). */
+function titleSize(name: string) {
+  if (name.length > 34) return 'text-lg'
+  if (name.length > 20) return 'text-xl'
+  return 'text-2xl'
 }

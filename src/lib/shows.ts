@@ -44,7 +44,7 @@ export async function unfollow(tmdbId: number) {
   })
 }
 
-/** "Stopped watching": keep following (Shows, Rankings) but hide the show from Watching. */
+/** "Stopped watching": keep following (Shows, Rankings) but hide the show from Tracking. */
 export async function setStopped(tmdbId: number, stopped: boolean) {
   await db.shows.update(tmdbId, { stopped })
 }

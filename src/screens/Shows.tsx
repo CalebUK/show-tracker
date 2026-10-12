@@ -118,7 +118,7 @@ export function Shows() {
               >
                 <Poster path={show.poster_path} name={show.name} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[15px] font-medium">{show.name}</div>
+                  <div className="line-clamp-2 text-[15px] leading-snug font-medium [overflow-wrap:anywhere]">{show.name}</div>
                   <div className="truncate text-sm text-neutral-500 dark:text-neutral-400">
                     {filter === 'finished'
                       ? finishedLine(show, progress(show))

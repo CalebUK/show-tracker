@@ -18,7 +18,7 @@ export function ScreenHeader({ title, right, children }: { title: string; right?
 }
 
 const TABS: { id: Tab; label: string; path: string; Icon: typeof TvIcon }[] = [
-  { id: 'watching', label: 'Watching', path: '/', Icon: PlayIcon },
+  { id: 'tracking', label: 'Tracking', path: '/', Icon: PlayIcon },
   { id: 'shows', label: 'Shows', path: '/shows', Icon: TvIcon },
   { id: 'rankings', label: 'Rankings', path: '/rankings', Icon: RankIcon },
   { id: 'search', label: 'Search', path: '/search', Icon: SearchIcon },

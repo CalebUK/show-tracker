@@ -155,7 +155,7 @@ function ResultRow({ result, followed, score }: { result: SearchResult; followed
       <button onClick={() => navigate(`/show/${result.id}`)} className="flex min-w-0 flex-1 items-center gap-4 py-2.5 text-left">
         <Poster path={result.poster_path} name={result.name} size="sm" />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[15px] font-medium">{result.name}</div>
+          <div className="line-clamp-2 text-[15px] leading-snug font-medium [overflow-wrap:anywhere]">{result.name}</div>
           <div className="truncate text-sm text-neutral-500 dark:text-neutral-400">
             {[year, score != null ? `Ranked ${score.toFixed(1)}` : null].filter(Boolean).join(' · ')}
           </div>
@@ -182,7 +182,7 @@ function ResultRow({ result, followed, score }: { result: SearchResult; followed
         <div className="mt-5 flex flex-col gap-3">
           <SheetOption
             title="Start tracking"
-            body="Follow it and see new episodes on Watching."
+            body="Follow it and see its episodes on Tracking."
             onClick={startTracking}
             busy={busy === 'track'}
             disabled={busy != null}

@@ -24,7 +24,7 @@ function localMidnight(isoDate: string) {
   return new Date(y, m - 1, d).toISOString()
 }
 
-/** Everything the Watching and Shows screens need, recomputed when the data or the day changes. */
+/** Everything the Tracking and Shows screens need, recomputed when the data or the day changes. */
 export function useLibrary(now: Date): Library | undefined {
   const data = useLiveQuery(async () => {
     const [shows, episodes, watched] = await Promise.all([db.shows.toArray(), db.episodes.toArray(), db.watched.toArray()])
