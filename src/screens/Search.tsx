@@ -37,6 +37,8 @@ export function Search() {
     lastQuery = query
     const q = query.trim()
     if (q.length < 2 || !tmdbKey) {
+      // Drop any search still in flight, so its results don't land under a cleared box.
+      requestId.current++
       setLoading(false)
       if (!q) setResults((lastResults = null))
       return

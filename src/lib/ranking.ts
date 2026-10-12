@@ -2,7 +2,7 @@ import { db, getMeta, hasTicks, isOwned, setMeta, type Bucket, type Ranking, typ
 import { DEFAULT_QUESTIONS, K_KEEP, QUESTION_OPTIONS, eloUpdate, ratingToScore, type QuestionSetting } from './elo'
 import { createStore } from './store'
 
-/** Questions per ranking (Settings → Ranking). Stored per phone; not part of backups. */
+/** Questions per ranking (Settings → Ranking). Included in backups. */
 export const questionsStore = createStore<QuestionSetting>(DEFAULT_QUESTIONS)
 
 export async function loadQuestionSetting() {

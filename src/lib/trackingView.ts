@@ -1,7 +1,7 @@
 import { getMeta, setMeta } from '../db'
 import { createStore } from './store'
 
-/** Which view the Tracking tab opens on (Settings → Tracking opens on). Stored per phone; not part of backups. */
+/** Which view the Tracking tab opens on (Settings → Tracking opens on). Included in backups. */
 export type TrackingView = 'watching' | 'onair'
 
 export const defaultViewStore = createStore<TrackingView>('watching')

@@ -1,10 +1,7 @@
 import { getMeta, isOwned, setMeta, type Provider, type Show } from '../db'
 import { createStore } from './store'
 
-/**
- * The streaming services you have (Settings → Streaming services), for Shows → Able to stream.
- * Stored per phone, like the region they belong to; not part of backups.
- */
+/** The streaming services you have (Settings → Streaming services), for Shows → Able to stream. Included in backups. */
 export const myServicesStore = createStore<Provider[]>([])
 
 export async function loadMyServices() {
@@ -15,9 +12,12 @@ export async function loadMyServices() {
 /** Ticking adds the service; unticking removes it along with any variant of it you'd ticked. */
 export async function setServiceTicked(service: Provider, ticked: boolean) {
   const rest = myServicesStore.get().filter((s) => !sameService(s, service))
-  const next = ticked ? [...rest, { id: service.id, name: service.name, logo_path: service.logo_path }] : rest
-  await setMeta('myServices', next)
-  myServicesStore.set(next)
+  await setMyServices(ticked ? [...rest, { id: service.id, name: service.name, logo_path: service.logo_path }] : rest)
+}
+
+export async function setMyServices(list: Provider[]) {
+  await setMeta('myServices', list)
+  myServicesStore.set(list)
 }
 
 // "Disney+" and "Disney Plus" are the same service.

@@ -1,18 +1,33 @@
-import { db, episodeKey, setMeta, type Bucket, type Episode, type Ranking, type Show, type Watched } from '../db'
-import { ratingToScore, scoreToRating, startingRating } from './elo'
+import { db, episodeKey, setMeta, type Bucket, type Episode, type Provider, type Ranking, type Show, type Watched } from '../db'
+import { QUESTION_OPTIONS, ratingToScore, scoreToRating, startingRating, type QuestionSetting } from './elo'
+import type { OnAirFilter } from './onAir'
+import type { ThemePref } from './theme'
+import type { TrackingView } from './trackingView'
+
+/** Per-phone settings, so a new phone is set up in one go. The TMDB token is never included. */
+export interface BackupSettings {
+  /** '' = automatic */
+  region?: string
+  services?: Provider[]
+  onAirFilter?: OnAirFilter
+  trackingView?: TrackingView
+  rankingQuestions?: QuestionSetting
+  theme?: ThemePref
+}
 
 export interface BackupFile {
   app: 'show-tracker'
-  /** 1 = no watched episodes, 2 = rankings by position. Both still import. */
-  version: 3
+  /** 1 = no watched episodes, 2 = rankings by position, 3 = no settings. All still import. */
+  version: 4
   exported_at: string
   shows: Show[]
   episodes: Episode[]
   rankings: Ranking[]
   watched: Watched[]
+  settings: BackupSettings
 }
 
-export async function buildBackup(): Promise<File> {
+export async function buildBackup(settings: BackupSettings = {}): Promise<File> {
   const [shows, episodes, rankings, watched] = await Promise.all([
     db.shows.toArray(),
     db.episodes.toArray(),
@@ -21,13 +36,14 @@ export async function buildBackup(): Promise<File> {
   ])
   const backup = {
     app: 'show-tracker',
-    version: 3,
+    version: 4,
     exported_at: new Date().toISOString(),
     // "Where to stream" changes all the time, so it isn't kept in backups; it always comes fresh from TMDB.
     shows: shows.map(({ streaming, ...show }) => show),
     episodes,
     rankings,
     watched,
+    settings,
   }
   const d = new Date()
   const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -85,7 +101,7 @@ export function parseBackup(text: string): BackupFile {
     throw new Error("That file isn't valid JSON.")
   }
   if (!isObj(data) || data.app !== 'show-tracker') throw new Error("That doesn't look like a Show Tracker backup.")
-  if (data.version !== 1 && data.version !== 2 && data.version !== 3) throw new Error(`Unsupported backup version: ${String(data.version)}`)
+  if (![1, 2, 3, 4].includes(data.version as number)) throw new Error(`Unsupported backup version: ${String(data.version)}`)
   if (!Array.isArray(data.shows) || !Array.isArray(data.episodes) || !Array.isArray(data.rankings)) {
     throw new Error('The backup is missing shows, episodes or rankings.')
   }
@@ -169,7 +185,40 @@ export function parseBackup(text: string): BackupFile {
     }
   })
 
-  return { app: 'show-tracker', version: 3, exported_at: strOrNull(data.exported_at) ?? '', shows, episodes, rankings, watched }
+  return {
+    app: 'show-tracker',
+    version: 4,
+    exported_at: strOrNull(data.exported_at) ?? '',
+    shows,
+    episodes,
+    rankings,
+    watched,
+    settings: parseSettings(data.settings),
+  }
+}
+
+const ON_AIR_FILTERS: OnAirFilter[] = ['all', 'caughtUp']
+const TRACKING_VIEWS: TrackingView[] = ['watching', 'onair']
+const THEMES: ThemePref[] = ['system', 'light', 'dark']
+
+/** Only well-formed settings are kept; anything else stays as it is on this phone. */
+function parseSettings(v: unknown): BackupSettings {
+  if (!isObj(v)) return {}
+  const out: BackupSettings = {}
+  if (typeof v.region === 'string' && /^([A-Z]{2})?$/.test(v.region)) out.region = v.region
+  if (Array.isArray(v.services)) {
+    out.services = []
+    for (const p of v.services) {
+      if (isObj(p) && num(p.id) && typeof p.name === 'string') {
+        out.services.push({ id: p.id as number, name: p.name, logo_path: strOrNull(p.logo_path) })
+      }
+    }
+  }
+  if (ON_AIR_FILTERS.includes(v.onAirFilter as OnAirFilter)) out.onAirFilter = v.onAirFilter as OnAirFilter
+  if (TRACKING_VIEWS.includes(v.trackingView as TrackingView)) out.trackingView = v.trackingView as TrackingView
+  if (QUESTION_OPTIONS.includes(v.rankingQuestions as QuestionSetting)) out.rankingQuestions = v.rankingQuestions as QuestionSetting
+  if (THEMES.includes(v.theme as ThemePref)) out.theme = v.theme as ThemePref
+  return out
 }
 
 /** Replace everything on this device with the backup's contents. */

@@ -5,7 +5,7 @@ import { createStore } from './store'
 /**
  * Which shows appear under Tracking → On air (Settings → On air):
  * every show, or only ones you're on the current season of (so season 3 doesn't show while
- * you're still on season 1). Stored per phone; not part of backups.
+ * you're still on season 1). Included in backups.
  */
 export type OnAirFilter = 'all' | 'caughtUp'
 

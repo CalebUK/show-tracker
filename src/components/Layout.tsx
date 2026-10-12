@@ -81,6 +81,7 @@ export function Chips<T extends string>({
         <button
           key={o.id}
           onClick={() => onChange(o.id)}
+          aria-pressed={value === o.id}
           className={`h-8 shrink-0 rounded-full px-3.5 text-sm font-medium transition ${
             value === o.id
               ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'

@@ -4,7 +4,7 @@ export type ThemePref = 'system' | 'light' | 'dark'
 
 /**
  * Kept in localStorage (not IndexedDB) so the inline script in index.html can apply it
- * before the first paint. It's a per-phone display preference, so it isn't backed up.
+ * before the first paint. Included in backups (see preferences.ts).
  */
 const KEY = 'theme'
 const media = window.matchMedia('(prefers-color-scheme: dark)')

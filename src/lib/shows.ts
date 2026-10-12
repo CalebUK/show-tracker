@@ -64,16 +64,26 @@ export async function refreshShow(tmdbId: number, prefetched?: ShowDetails) {
   const show = await db.shows.get(tmdbId)
   if (!show?.followed) return
   const details = prefetched ?? (await getShowDetails(tmdbId, { fresh: true }))
-  const tvmazeId = show.tvmaze_id ?? (await lookupTvmazeId(details.show.imdb_id, details.tvdb_id))
-  const episodes = tvmazeId ? await getEpisodes(tvmazeId, tmdbId) : []
-  await addTmdbRuntimes(tmdbId, episodes)
+  const lookup = () => lookupTvmazeId(details.show.imdb_id, details.tvdb_id)
+  let tvmazeId = show.tvmaze_id ?? (await lookup())
+  let episodes = tvmazeId ? await getEpisodes(tvmazeId, tmdbId) : null
+  // TVmaze no longer knows the saved id (shows get merged or re-added): look the show up again.
+  if (!episodes && show.tvmaze_id) {
+    tvmazeId = await lookup()
+    episodes = tvmazeId ? await getEpisodes(tvmazeId, tmdbId) : null
+  }
+  if (episodes) await addTmdbRuntimes(tmdbId, episodes)
 
   await db.transaction('rw', db.shows, db.episodes, async () => {
     const current = await db.shows.get(tmdbId)
     if (!current?.followed) return // unfollowed while we were fetching
-    await db.episodes.where('tmdb_show_id').equals(tmdbId).delete()
-    await db.episodes.bulkPut(episodes)
-    await db.shows.put({ ...current, ...details.show, tvmaze_id: tvmazeId, last_refreshed_at: new Date().toISOString() })
+    // No list from TVmaze: keep the episodes we have rather than wiping them, and look the
+    // show up again next time.
+    if (episodes) {
+      await db.episodes.where('tmdb_show_id').equals(tmdbId).delete()
+      await db.episodes.bulkPut(episodes)
+    }
+    await db.shows.put({ ...current, ...details.show, tvmaze_id: episodes ? tvmazeId : null, last_refreshed_at: new Date().toISOString() })
   })
 }
 

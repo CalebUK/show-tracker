@@ -49,3 +49,34 @@ describe('rankings in backups', () => {
     expect(b.rankings[0]).toMatchObject({ rating: 1580, comparisons: 4, score: 5.8 })
   })
 })
+
+describe('settings in backups', () => {
+  const settings = {
+    region: 'GB',
+    services: [{ id: 8, name: 'Netflix', logo_path: '/n.png' }],
+    onAirFilter: 'caughtUp',
+    trackingView: 'onair',
+    rankingQuestions: 'all',
+    theme: 'dark',
+  }
+
+  it('reads them from version 4', () => {
+    expect(parseBackup(JSON.stringify({ ...valid, version: 4, settings })).settings).toEqual(settings)
+  })
+
+  it('has none in older backups, so this phone keeps its own', () => {
+    expect(parseBackup(JSON.stringify({ ...valid, version: 3 })).settings).toEqual({})
+  })
+
+  it('drops anything malformed instead of rejecting the backup', () => {
+    const junk = { region: 'Britain', services: [{ id: 'x' }, { id: 9, name: 'Prime' }, null], onAirFilter: 'some', trackingView: 1, rankingQuestions: 7, theme: 'pink' }
+    expect(parseBackup(JSON.stringify({ ...valid, version: 4, settings: junk })).settings).toEqual({
+      services: [{ id: 9, name: 'Prime', logo_path: null }],
+    })
+    expect(parseBackup(JSON.stringify({ ...valid, version: 4, settings: { region: '' } })).settings).toEqual({ region: '' })
+  })
+
+  it('rejects versions from a newer app', () => {
+    expect(() => parseBackup(JSON.stringify({ ...valid, version: 5 }))).toThrow(/Unsupported backup version: 5/)
+  })
+})

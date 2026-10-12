@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, getMeta, type Provider } from '../db'
 import { buildBackup, parseBackup, restoreBackup, saveFile, type BackupFile } from '../lib/backup'
+import { applySettings, currentSettings } from '../lib/preferences'
 import { installPrompt, isIOS, isStandalone } from '../lib/install'
 import { formatDuration, timeAgo } from '../lib/dates'
 import { useLibrary } from '../hooks/useLibrary'
@@ -62,7 +63,7 @@ export function Settings() {
   const exportBackup = async () => {
     setBusy(true)
     try {
-      await handleSave(await buildBackup())
+      await handleSave(await buildBackup(currentSettings()))
     } catch (err) {
       toast(errorMessage(err))
     } finally {
@@ -86,6 +87,7 @@ export function Settings() {
     setBusy(true)
     try {
       await restoreBackup(pending)
+      await applySettings(pending.settings)
       setPending(null)
       toast('Backup restored')
       refreshFollowed({ force: true })
@@ -145,6 +147,7 @@ export function Settings() {
                 The backup{pending.exported_at ? ` from ${new Date(pending.exported_at).toLocaleDateString()}` : ''} has{' '}
                 {pending.shows.filter((s) => s.followed).length} followed and {pending.rankings.length} ranked shows.
                 {counts && ` Your current ${counts.followed} followed and ${counts.rankings} ranked shows will be replaced.`}
+                {Object.keys(pending.settings).length > 0 && ' Your settings (region, streaming services and the rest) come back too.'}
               </p>
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <Button variant="secondary" onClick={() => setPending(null)} disabled={busy}>

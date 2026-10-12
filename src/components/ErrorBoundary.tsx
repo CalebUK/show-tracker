@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react'
 import { buildBackup, saveFile } from '../lib/backup'
+import { currentSettings } from '../lib/preferences'
 
 /**
  * If anything throws while drawing the app, show a recovery screen instead of a blank page:
@@ -18,7 +19,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
 
   exportBackup = async () => {
     try {
-      const result = await saveFile(await buildBackup())
+      const result = await saveFile(await buildBackup(currentSettings()))
       this.setState({ exportNote: result === 'cancelled' ? null : 'Backup saved.' })
     } catch {
       this.setState({ exportNote: "Couldn't export a backup." })

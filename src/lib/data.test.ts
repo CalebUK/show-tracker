@@ -9,7 +9,7 @@ import { ratePromptStore } from './ratePrompt'
 import { removeRanking, restoreRankings, saveComparison, saveRanking } from './ranking'
 import { refreshShow, setOwned, unfollow } from './shows'
 import { getEpisodeRuntimes, getShowDetails, type ShowDetails } from './tmdb'
-import { getEpisodes } from './tvmaze'
+import { getEpisodes, lookupTvmazeId } from './tvmaze'
 import { setWatched } from './watched'
 
 // TMDB and TVmaze are replaced with canned answers; nothing here touches the network.
@@ -235,8 +235,10 @@ describe('backups', () => {
     await db.rankings.put(ranking(50, 'liked', 1900))
     await setWatched([ep(50, 1, 1)], true, { promptToRate: false })
 
-    const text = await (await buildBackup()).text()
+    const text = await (await buildBackup({ region: 'GB', theme: 'dark' })).text()
     expect(JSON.parse(text).shows[0]).not.toHaveProperty('streaming')
+    expect(JSON.parse(text)).not.toHaveProperty('settings.tmdbKey')
+    expect(parseBackup(text).settings).toEqual({ region: 'GB', theme: 'dark' })
 
     await db.shows.put(show(99)) // something that should disappear on restore
     await restoreBackup(parseBackup(text))
@@ -296,6 +298,25 @@ describe('refreshing a show', () => {
     await setWatched([ep(60, 1, 1)], true, { promptToRate: false })
     await refreshShow(60)
     expect(await db.watched.get(episodeKey(60, 1, 1))).toBeDefined()
+  })
+
+  it("looks the show up again when TVmaze no longer knows its id", async () => {
+    vi.mocked(getEpisodes).mockImplementation(async (tvmazeId) => (tvmazeId === 160 ? null : tvmazeEpisodes()))
+    vi.mocked(lookupTvmazeId).mockResolvedValue(999)
+    await refreshShow(60)
+    expect((await db.shows.get(60))?.tvmaze_id).toBe(999)
+    expect(await db.episodes.where('tmdb_show_id').equals(60).count()).toBe(3)
+  })
+
+  it("keeps the episodes it has when TVmaze can't find the show at all", async () => {
+    await refreshShow(60)
+    vi.mocked(getEpisodes).mockResolvedValue(null)
+    vi.mocked(lookupTvmazeId).mockResolvedValue(null)
+    await refreshShow(60)
+    expect(await db.episodes.where('tmdb_show_id').equals(60).count()).toBe(3)
+    expect((await db.shows.get(60))?.tvmaze_id).toBeNull() // tries a fresh lookup next time
+    await refreshShow(60)
+    expect(await db.episodes.where('tmdb_show_id').equals(60).count()).toBe(3)
   })
 
   it('leaves shows you no longer follow alone', async () => {

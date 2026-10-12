@@ -42,9 +42,13 @@ interface TvmazeEpisode {
   runtime: number | null
 }
 
-/** The full episode list (past and future), so past episodes can be ticked as watched. */
-export async function getEpisodes(tvmazeId: number, tmdbShowId: number): Promise<Episode[]> {
-  const list = (await get<TvmazeEpisode[]>(`/shows/${tvmazeId}/episodes`)) ?? []
+/**
+ * The full episode list (past and future), so past episodes can be ticked as watched.
+ * null if TVmaze doesn't know the id (any more: shows sometimes get merged or re-added).
+ */
+export async function getEpisodes(tvmazeId: number, tmdbShowId: number): Promise<Episode[] | null> {
+  const list = await get<TvmazeEpisode[]>(`/shows/${tvmazeId}/episodes`)
+  if (!list) return null
   const out: Episode[] = []
   for (const e of list) {
     if (!e.airstamp) continue
