@@ -37,19 +37,21 @@ export async function buildBackup(): Promise<File> {
 export type SaveResult = 'shared' | 'downloaded' | 'cancelled' | 'needs-tap'
 
 /**
- * Use the share sheet where it can take files (so it can go to iCloud Drive / Google Drive),
- * otherwise fall back to a download. Safari may refuse to share if too much time passed since
- * the tap; in that case the caller shows a button to try again with the prepared file.
+ * With `share` (iPhone), use the share sheet so the file can go to Files / iCloud Drive. Safari may
+ * refuse if too much time passed since the tap; the caller then shows a button to try again
+ * (`fromTap`), and if a fresh tap is refused too, it downloads instead.
+ * Everywhere else it's a plain download: Chrome on Android offers the share sheet for files but
+ * refuses .json ones, so sharing there never got anywhere.
  */
-export async function saveFile(file: File): Promise<SaveResult> {
-  if (navigator.canShare?.({ files: [file] })) {
+export async function saveFile(file: File, { share = false, fromTap = false } = {}): Promise<SaveResult> {
+  if (share && navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: file.name })
       await markBackedUp()
       return 'shared'
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return 'cancelled'
-      if (err instanceof DOMException && err.name === 'NotAllowedError') return 'needs-tap'
+      if (err instanceof DOMException && err.name === 'NotAllowedError' && !fromTap) return 'needs-tap'
       // Any other failure: fall through to a plain download.
     }
   }

@@ -49,12 +49,13 @@ export function Settings() {
   const [busy, setBusy] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
-  const handleSave = async (file: File) => {
-    const result = await saveFile(file)
+  const handleSave = async (file: File, fromTap = false) => {
+    const result = await saveFile(file, { share: isIOS(), fromTap })
     if (result === 'needs-tap') setPrepared(file)
     else {
       setPrepared(null)
-      if (result !== 'cancelled') toast('Backup saved')
+      if (result === 'downloaded') toast('Backup saved to your Downloads folder')
+      else if (result === 'shared') toast('Backup saved')
     }
   }
 
@@ -131,7 +132,7 @@ export function Settings() {
           {prepared && (
             <div className="mt-4 rounded-xl bg-neutral-50 p-4 dark:bg-neutral-900">
               <p className="text-sm">Your backup is ready.</p>
-              <Button className="mt-3 w-full" onClick={() => handleSave(prepared)}>
+              <Button className="mt-3 w-full" onClick={() => handleSave(prepared, true)}>
                 Save {prepared.name}
               </Button>
             </div>

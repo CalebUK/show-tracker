@@ -50,7 +50,7 @@ src/
   lib/elo.ts            Elo maths: ratings ↔ scores, updates, picking the next comparison
   lib/ranking.ts        Saving and removing rankings, sort order
   lib/dates.ts          Today / This week / Later grouping, local-time formatting
-  lib/backup.ts         Export (share sheet or download), validated import
+  lib/backup.ts         Export (share sheet on iPhone, download elsewhere), validated import
   lib/router.ts         Tiny hash router (Android back button works)
   screens/              Tracking, Shows, Rankings, Search, Settings, ShowDetail, RankFlow
 ```
@@ -80,6 +80,7 @@ A few choices the spec left open:
 - **Your stats** at the top of Settings adds up episodes watched, time watched and shows finished (ended and fully watched) across every show.
 - **Security headers** live in `vercel.json` (Content-Security-Policy limiting scripts to the app and connections to TMDB/TVmaze, no framing, nosniff, no referrer, and a locked-down Permissions-Policy). `npm run preview` sends the same headers so they can be tested locally. The light/dark script is a file (`public/theme-init.js`) rather than inline, so the policy can stay `script-src 'self'`.
 - **Poster cache**: TMDB images are loaded with CORS and a `?cors` marker on the URL, so the offline cache stores them at their real size (opaque responses count as ~7 MB each against the storage quota). The marker matters because TMDB doesn't send `Vary: Origin`, so copies cached by older, non-CORS loads would otherwise be reused and fail.
+- **Export backup** uses the share sheet on iPhone (Save to Files / iCloud Drive) and a plain download everywhere else. Chrome on Android offers the share sheet for files but refuses .json ones, so sharing there never worked; the file now lands in Downloads.
 - A **safety-net screen** (error boundary) replaces a blank page if something crashes, with Reload and Export backup.
 - Unfollowing a show you've **ticked episodes of** keeps its record and episode list, so its history and time stay in Your stats.
 - Ticking the episode that **finishes** an unranked show offers to rate it.
