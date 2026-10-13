@@ -1,7 +1,7 @@
 import { getMeta, isOwned, setMeta, type Provider, type Show } from '../db'
 import { createStore } from './store'
 
-/** The streaming services you have (Settings → Streaming services), for Shows → Able to stream. Included in backups. */
+/** The streaming services you have (Settings → Streaming services), for Shows → Stream. Included in backups. */
 export const myServicesStore = createStore<Provider[]>([])
 
 export async function loadMyServices() {

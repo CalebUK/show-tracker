@@ -76,13 +76,13 @@ export function Chips<T extends string>({
   onChange: (id: T) => void
 }) {
   return (
-    <div className="flex flex-wrap gap-2 px-5 pb-3">
+    <div className="flex flex-wrap gap-1.5 px-5 pb-3">
       {options.map((o) => (
         <button
           key={o.id}
           onClick={() => onChange(o.id)}
           aria-pressed={value === o.id}
-          className={`h-8 shrink-0 rounded-full px-3.5 text-sm font-medium transition ${
+          className={`h-8 shrink-0 rounded-full px-2.5 text-[13px] font-medium transition ${
             value === o.id
               ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
               : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'

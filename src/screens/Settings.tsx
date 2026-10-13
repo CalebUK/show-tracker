@@ -377,7 +377,7 @@ function ServicesSection() {
   return (
     <Section title="Streaming services">
       <p className="text-sm text-neutral-500 dark:text-neutral-400">
-        Tick the ones you have. Shows → Able to stream then lists the shows you follow that are on them, plus any you own on DVD
+        Tick the ones you have. Shows → Stream then lists the shows you follow that are on them, plus any you own on DVD
         or streaming.
       </p>
       {/* Collapsed by default: the summary shows what's ticked, the list opens on tap. */}

@@ -10,7 +10,13 @@ import { Button, Chips, EmptyState, ScreenHeader, Switch } from '../components/L
 import { Poster } from '../components/Poster'
 import { CloseIcon, PlusIcon, SearchIcon } from '../components/Icons'
 
-type Filter = 'stream' | 'notStarted' | 'finished'
+type Filter = 'stream' | 'notStarted' | 'finished' | 'almostDone'
+
+/** "Almost done": at least this much of the aired episodes watched, with some still to go. */
+const ALMOST_DONE = 0.75
+
+/** How far through the aired episodes you are (going by the furthest one ticked), 0–1. */
+const doneShare = (p: Progress) => (p.aired ? (p.aired - p.left) / p.aired : 0)
 
 // Kept outside the component so switching tabs doesn't reset the filter or search. null = everything.
 let lastFilter: Filter | null = null
@@ -60,15 +66,20 @@ export function Shows() {
     notStarted: all.filter((s) => !s.stopped && !progress(s).started),
     // Shows you're done with: finished, or marked "Stopped watching".
     finished: all.filter((s) => finished(s) || s.stopped),
+    almostDone: all.filter((s) => !s.stopped && progress(s).started && progress(s).left > 0 && doneShare(progress(s)) >= ALMOST_DONE),
   }
   const hasAny = all.length > 0
   const filtered = filter ? (lists?.[filter] ?? []) : all
   // Finished: most time spent first (a finished show's whole length, or what you watched before
-  // stopping); the rest A–Z.
+  // stopping). Almost done: closest to the end first. The rest A–Z.
   const sorted =
     filter === 'finished'
       ? [...filtered].sort((a, b) => (progress(b).minutesWatched ?? -1) - (progress(a).minutesWatched ?? -1) || a.name.localeCompare(b.name))
-      : filtered
+      : filter === 'almostDone'
+        ? [...filtered].sort(
+            (a, b) => doneShare(progress(b)) - doneShare(progress(a)) || progress(a).left - progress(b).left || a.name.localeCompare(b.name),
+          )
+        : filtered
   const q = fold(query.trim())
   const listed = q ? sorted.filter((s) => fold(s.name).includes(q)) : sorted
   // Done = nothing left to watch (finished, or waiting for more episodes) or stopped watching.
@@ -132,9 +143,10 @@ export function Shows() {
             {/* No counts on the chips so all three fit on one line; the count sits on the row below. */}
             <Chips
               options={[
-                { id: 'stream', label: 'Able to stream' },
+                { id: 'stream', label: 'Stream' },
                 { id: 'notStarted', label: 'Not started' },
                 { id: 'finished', label: 'Finished' },
+                { id: 'almostDone', label: 'Almost done' },
               ]}
               value={filter}
               onChange={setFilter}
@@ -185,9 +197,11 @@ export function Shows() {
                 <div className="min-w-0 flex-1">
                   <div className="line-clamp-2 text-[15px] leading-snug font-medium [overflow-wrap:anywhere]">{show.name}</div>
                   <div className="truncate text-sm text-neutral-500 dark:text-neutral-400">
-                    {finished(show)
-                      ? finishedLine(show, progress(show))
-                      : statusLine(show, progress(show), library!.nextUp.get(show.tmdb_id), now)}
+                    {filter === 'almostDone'
+                      ? almostDoneLine(progress(show))
+                      : finished(show)
+                        ? finishedLine(show, progress(show))
+                        : statusLine(show, progress(show), library!.nextUp.get(show.tmdb_id), now)}
                   </div>
                   {filter === 'stream' && <div className="truncate text-xs text-accent-text">{whereToWatch(show, myServices)}</div>}
                 </div>
@@ -207,6 +221,7 @@ function emptyMessage(filter: Filter | null, hidden: number, hasServices: boolea
       ? "None of the shows you follow are on your streaming services right now, and you haven't marked any as owned."
       : 'Tick the streaming services you have in Settings, and the shows you follow that are on them will appear here, along with any you own on DVD or streaming.'
   }
+  if (filter === 'almostDone') return `Shows you're at least ${ALMOST_DONE * 100}% of the way through, with episodes still to go, will appear here.`
   if (filter === 'finished') return "Shows that have ended and you've watched every episode of, and ones you've stopped watching, will appear here."
   return "You've started everything you follow."
 }
@@ -221,6 +236,11 @@ function statusLine(show: Show, p: Progress, nextUp: Episode | undefined, now: D
   }
   if (p.next) return `Up next: ${episodeLabel([p.next])} · ${p.left} left`
   return scheduled ? `Caught up · next ${scheduled}` : `Caught up · ${nextSeasonNote(show)}`
+}
+
+/** "92% · 5 left". Rounded down, so it never says 100% while episodes are left. */
+function almostDoneLine(p: Progress) {
+  return `${Math.floor(doneShare(p) * 100)}% · ${p.left} left`
 }
 
 /** "Stopped watching · 12 of 62 episodes · 9h 30m": how far you got. */
