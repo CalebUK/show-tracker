@@ -8,12 +8,16 @@ import { useLibrary } from '../hooks/useLibrary'
 import { useNow } from '../hooks/useNow'
 import { Button, Chips, EmptyState, ScreenHeader, Switch } from '../components/Layout'
 import { Poster } from '../components/Poster'
-import { PlusIcon } from '../components/Icons'
+import { CloseIcon, PlusIcon, SearchIcon } from '../components/Icons'
 
 type Filter = 'stream' | 'notStarted' | 'finished'
 
-// Kept outside the component so switching tabs doesn't reset the filter. null = everything.
+// Kept outside the component so switching tabs doesn't reset the filter or search. null = everything.
 let lastFilter: Filter | null = null
+let lastQuery = ''
+
+/** Lower case without accents, so "pokemon" finds "Pokémon". */
+const fold = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
 const HIDE_KEY = 'shows.hideCompleted'
 function loadHide() {
@@ -39,6 +43,8 @@ export function Shows() {
   const [filter, setFilterState] = useState<Filter | null>(lastFilter)
   // Tapping the selected filter again goes back to everything.
   const setFilter = (f: Filter) => setFilterState((lastFilter = f === filter ? null : f))
+  const [query, setQueryState] = useState(lastQuery)
+  const setQuery = (q: string) => setQueryState((lastQuery = q))
   const [hideCompleted, setHideState] = useState(loadHide)
   const setHide = (v: boolean) => {
     saveHide(v)
@@ -55,12 +61,20 @@ export function Shows() {
     finished: all.filter(finished),
   }
   const hasAny = all.length > 0
-  const listed = filter ? (lists?.[filter] ?? []) : all
+  const filtered = filter ? (lists?.[filter] ?? []) : all
+  // Finished: longest shows first (total runtime), the rest A–Z.
+  const sorted =
+    filter === 'finished'
+      ? [...filtered].sort((a, b) => (progress(b).minutesWatched ?? -1) - (progress(a).minutesWatched ?? -1) || a.name.localeCompare(b.name))
+      : filtered
+  const q = fold(query.trim())
+  const listed = q ? sorted.filter((s) => fold(s.name).includes(q)) : sorted
   // Completed = nothing left to watch, whether it's finished or waiting for more episodes.
   // It doesn't apply to the Finished filter, which is all completed shows.
   const canHide = filter !== 'finished'
   const shows = canHide && hideCompleted ? listed.filter((s) => !progress(s).caughtUp) : listed
   const hiddenCount = listed.length - shows.length
+  const noMatch = q !== '' && listed.length === 0
 
   return (
     <>
@@ -88,6 +102,30 @@ export function Shows() {
       >
         {hasAny && lists && (
           <>
+            <div className="px-5 pb-3">
+              <label className="flex h-10 items-center gap-2 rounded-xl bg-neutral-100 px-3 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+                <SearchIcon width={16} height={16} />
+                <input
+                  type="search"
+                  inputMode="search"
+                  enterKeyHint="search"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  placeholder="Search your shows"
+                  aria-label="Search your shows"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                  className="h-full min-w-0 flex-1 bg-transparent text-base text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100 [&::-webkit-search-cancel-button]:hidden"
+                />
+                {query && (
+                  <button onClick={() => setQuery('')} aria-label="Clear search" className="p-1">
+                    <CloseIcon width={14} height={14} />
+                  </button>
+                )}
+              </label>
+            </div>
             {/* No counts on the chips so all three fit on one line; the count sits on the row below. */}
             <Chips
               options={[
@@ -115,9 +153,9 @@ export function Shows() {
       ) : lists && shows.length === 0 ? (
         <div className="px-5 pt-8">
           <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-            {emptyMessage(filter, hiddenCount, myServices.length > 0)}
+            {noMatch ? `No shows here match “${query.trim()}”.` : emptyMessage(filter, hiddenCount, myServices.length > 0)}
           </p>
-          {filter === 'stream' && hiddenCount === 0 && (
+          {filter === 'stream' && !noMatch && hiddenCount === 0 && (
             <Button variant="secondary" className="mt-4" onClick={() => navigate('/settings', { replace: true })}>
               Choose your services
             </Button>
