@@ -19,7 +19,7 @@ let lastQuery = ''
 /** Lower case without accents, so "pokemon" finds "Pokémon". */
 const fold = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
-const HIDE_KEY = 'shows.hideCompleted'
+const HIDE_KEY = 'shows.hideCompleted' // older name, kept so the switch remembers its setting
 function loadHide() {
   try {
     return localStorage.getItem(HIDE_KEY) === '1'
@@ -45,7 +45,7 @@ export function Shows() {
   const setFilter = (f: Filter) => setFilterState((lastFilter = f === filter ? null : f))
   const [query, setQueryState] = useState(lastQuery)
   const setQuery = (q: string) => setQueryState((lastQuery = q))
-  const [hideCompleted, setHideState] = useState(loadHide)
+  const [hideDone, setHideState] = useState(loadHide)
   const setHide = (v: boolean) => {
     saveHide(v)
     setHideState(v)
@@ -58,21 +58,24 @@ export function Shows() {
     // On one of your services (Settings → Streaming services), or owned on DVD or streaming.
     stream: all.filter((s) => canStream(s, myServices)),
     notStarted: all.filter((s) => !s.stopped && !progress(s).started),
-    finished: all.filter(finished),
+    // Shows you're done with: finished, or marked "Stopped watching".
+    finished: all.filter((s) => finished(s) || s.stopped),
   }
   const hasAny = all.length > 0
   const filtered = filter ? (lists?.[filter] ?? []) : all
-  // Finished: longest shows first (total runtime), the rest A–Z.
+  // Finished: most time spent first (a finished show's whole length, or what you watched before
+  // stopping); the rest A–Z.
   const sorted =
     filter === 'finished'
       ? [...filtered].sort((a, b) => (progress(b).minutesWatched ?? -1) - (progress(a).minutesWatched ?? -1) || a.name.localeCompare(b.name))
       : filtered
   const q = fold(query.trim())
   const listed = q ? sorted.filter((s) => fold(s.name).includes(q)) : sorted
-  // Completed = nothing left to watch, whether it's finished or waiting for more episodes.
-  // It doesn't apply to the Finished filter, which is all completed shows.
+  // Done = nothing left to watch (finished, or waiting for more episodes) or stopped watching.
+  // It doesn't apply to the Finished filter, which is all done shows.
+  const isDone = (s: Show) => progress(s).caughtUp || s.stopped === true
   const canHide = filter !== 'finished'
-  const shows = canHide && hideCompleted ? listed.filter((s) => !progress(s).caughtUp) : listed
+  const shows = canHide && hideDone ? listed.filter((s) => !isDone(s)) : listed
   const hiddenCount = listed.length - shows.length
   const noMatch = q !== '' && listed.length === 0
 
@@ -86,8 +89,8 @@ export function Shows() {
               <label
                 className={`mr-1 flex cursor-pointer items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300 ${canHide ? '' : 'opacity-50'}`}
               >
-                Hide completed
-                <Switch checked={hideCompleted} onChange={setHide} disabled={!canHide} label="Hide completed" />
+                Hide done
+                <Switch checked={hideDone} onChange={setHide} disabled={!canHide} label="Hide done" />
               </label>
               <button
                 onClick={() => navigate('/search', { replace: true })}
@@ -138,7 +141,7 @@ export function Shows() {
             />
             <p className="px-5 pb-3 text-sm text-neutral-400 tabular-nums">
               {shows.length} show{shows.length === 1 ? '' : 's'}
-              {hiddenCount > 0 && ` · ${hiddenCount} completed hidden`}
+              {hiddenCount > 0 && ` · ${hiddenCount} done hidden`}
             </p>
           </>
         )}
@@ -198,19 +201,19 @@ export function Shows() {
 }
 
 function emptyMessage(filter: Filter | null, hidden: number, hasServices: boolean) {
-  if (hidden > 0) return 'Everything here is completed. Switch off Hide completed to see it.'
+  if (hidden > 0) return "There's nothing left to watch here. Switch off Hide done to see everything."
   if (filter === 'stream') {
     return hasServices
       ? "None of the shows you follow are on your streaming services right now, and you haven't marked any as owned."
       : 'Tick the streaming services you have in Settings, and the shows you follow that are on them will appear here, along with any you own on DVD or streaming.'
   }
-  if (filter === 'finished') return "Shows that have ended and you've watched every episode of will appear here."
+  if (filter === 'finished') return "Shows that have ended and you've watched every episode of, and ones you've stopped watching, will appear here."
   return "You've started everything you follow."
 }
 
 /** Where you're up to, plus what's next on the schedule (or TMDB's news if nothing is). */
 function statusLine(show: Show, p: Progress, nextUp: Episode | undefined, now: Date) {
-  if (show.stopped) return 'Stopped watching'
+  if (show.stopped) return stoppedLine(p)
   const scheduled = nextUp && `${episodeLabel([nextUp])} ${formatShortDate(nextUp, now)}`
   if (!p.started) {
     if (p.aired > 0) return `Not started · ${p.aired} episode${p.aired === 1 ? '' : 's'}`
@@ -218,6 +221,18 @@ function statusLine(show: Show, p: Progress, nextUp: Episode | undefined, now: D
   }
   if (p.next) return `Up next: ${episodeLabel([p.next])} · ${p.left} left`
   return scheduled ? `Caught up · next ${scheduled}` : `Caught up · ${nextSeasonNote(show)}`
+}
+
+/** "Stopped watching · 12 of 62 episodes · 9h 30m": how far you got. */
+function stoppedLine(p: Progress) {
+  if (!p.started) return 'Stopped watching'
+  return [
+    'Stopped watching',
+    `${p.watched} of ${p.aired} episode${p.aired === 1 ? '' : 's'}`,
+    p.minutesWatched != null ? formatDuration(p.minutesWatched) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 /** "Ended · 73 episodes · 2d 21h": how long the whole show was, from its episode runtimes. */
