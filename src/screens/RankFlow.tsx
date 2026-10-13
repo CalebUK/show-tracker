@@ -37,7 +37,8 @@ export function RankFlow({ id }: { id: number }) {
   const [error, setError] = useState<string | null>(null)
   const [step, setStep] = useState<Step>({ kind: 'bucket' })
   const current = useLiveQuery(() => db.rankings.get(id).then((r) => r ?? null), [id])
-  const othersRanked = useLiveQuery(() => db.rankings.filter((r) => r.tmdb_show_id !== id).count(), [id])
+  // Shows it can be compared with (ranked, and not excluded from rating).
+  const othersRanked = useLiveQuery(() => rankedPool(id).then((pool) => pool.length), [id])
 
   useEffect(() => {
     loadShow(id).then(setShow, (err) => setError(errorMessage(err)))
@@ -132,7 +133,8 @@ export function RankFlow({ id }: { id: number }) {
           </div>
           {othersRanked === 0 && (
             <p className="mt-6 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-              This is your first ranked show, so there's nothing to compare it with yet. Rank a few more and the questions start.
+              There are no other ranked shows to compare it with yet (shows excluded from rating don't count). Rank a few more and
+              the questions start.
             </p>
           )}
         </div>
@@ -256,7 +258,9 @@ export function ReadyToRank({ excludeId, title = 'Ready to rank' }: { excludeId?
     const [watched, ranked] = await Promise.all([db.watched.orderBy('tmdb_show_id').uniqueKeys(), db.rankings.toCollection().primaryKeys()])
     const rankedIds = new Set(ranked)
     const ids = (watched as number[]).filter((id) => id !== excludeId && !rankedIds.has(id))
-    return (await db.shows.bulkGet(ids)).filter((s): s is Show => !!s).sort((a, b) => a.name.localeCompare(b.name))
+    return (await db.shows.bulkGet(ids))
+      .filter((s): s is Show => !!s && !s.exclude_from_rating)
+      .sort((a, b) => a.name.localeCompare(b.name))
   }, [excludeId])
 
   if (!shows?.length) return null

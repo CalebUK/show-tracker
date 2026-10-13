@@ -49,6 +49,11 @@ export async function setStopped(tmdbId: number, stopped: boolean) {
   await db.shows.update(tmdbId, { stopped })
 }
 
+/** "Exclude from rating": keep it out of Ready to rank, the rate prompt, and other shows' comparisons. */
+export async function setExcludedFromRating(tmdbId: number, excluded: boolean) {
+  await db.shows.update(tmdbId, { exclude_from_rating: excluded })
+}
+
 /** Tick or untick "Own on DVD" / "Own on streaming". Saves the show if it isn't stored yet. */
 export async function setOwned(tmdbId: number, field: 'own_dvd' | 'own_streaming', value: boolean) {
   const show = await loadShow(tmdbId)

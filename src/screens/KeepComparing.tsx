@@ -20,7 +20,12 @@ export function KeepComparing() {
   const data = useLiveQuery(async () => {
     const rankings = await db.rankings.toArray()
     const shows = await db.shows.bulkGet(rankings.map((r) => r.tmdb_show_id))
-    return new Map(rankings.map((r, i) => [r.tmdb_show_id, { name: shows[i]?.name ?? 'Unknown show', poster: shows[i]?.poster_path ?? null }]))
+    // Shows excluded from rating never come up.
+    return new Map(
+      rankings.flatMap((r, i): [number, { name: string; poster: string | null }][] =>
+        shows[i]?.exclude_from_rating ? [] : [[r.tmdb_show_id, { name: shows[i]?.name ?? 'Unknown show', poster: shows[i]?.poster_path ?? null }]],
+      ),
+    )
   }, [])
   const ids = useMemo(() => (data ? [...data.keys()] : []), [data])
 

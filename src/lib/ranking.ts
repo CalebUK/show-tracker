@@ -34,17 +34,15 @@ export interface Opponent {
   rating: number
 }
 
-/** Every ranked show except one, as candidates to compare against. */
+/** Every ranked show except one, as candidates to compare against. Shows excluded from rating never are. */
 export async function rankedPool(excludeId: number): Promise<Opponent[]> {
   const rankings = (await db.rankings.toArray()).filter((r) => r.tmdb_show_id !== excludeId)
   const shows = await db.shows.bulkGet(rankings.map((r) => r.tmdb_show_id))
-  return rankings.map((r, i) => ({
-    id: r.tmdb_show_id,
-    name: shows[i]?.name ?? 'Unknown show',
-    poster_path: shows[i]?.poster_path ?? null,
-    bucket: r.bucket,
-    rating: r.rating,
-  }))
+  return rankings.flatMap((r, i) =>
+    shows[i]?.exclude_from_rating
+      ? []
+      : [{ id: r.tmdb_show_id, name: shows[i]?.name ?? 'Unknown show', poster_path: shows[i]?.poster_path ?? null, bucket: r.bucket, rating: r.rating }],
+  )
 }
 
 export interface RankingResult {

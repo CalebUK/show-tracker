@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Episode, type Show } from '../db'
 import { getShowDetails, logoUrl, regionName, useRegion, type ShowDetails } from '../lib/tmdb'
-import { follow, setOwned, setStopped, unfollow } from '../lib/shows'
+import { follow, setExcludedFromRating, setOwned, setStopped, unfollow } from '../lib/shows'
 import { BUCKETS, removeRanking, sortRankings } from '../lib/ranking'
 import { episodeLabel, formatAirTime, formatDateOnly } from '../lib/dates'
 import { navigate } from '../lib/router'
@@ -110,6 +110,15 @@ export function ShowDetail({ id }: { id: number }) {
     try {
       await setStopped(id, value)
       toast(value ? `${show.name} is hidden from Tracking` : `${show.name} is back on Tracking`)
+    } catch (err) {
+      toast(errorMessage(err))
+    }
+  }
+
+  const toggleExcluded = async (value: boolean) => {
+    try {
+      await setExcludedFromRating(id, value)
+      toast(value ? `${show.name} won't come up when rating` : `${show.name} is back in rating`)
     } catch (err) {
       toast(errorMessage(err))
     }
@@ -225,6 +234,19 @@ export function ShowDetail({ id }: { id: number }) {
               <OwnToggle label="Stopped watching" checked={stored.stopped === true} onChange={toggleStopped} />
             </div>
             <p className="text-sm text-neutral-500 dark:text-neutral-400">Keeps it in Shows and Rankings, but hides it from Tracking.</p>
+          </section>
+        )}
+
+        {stored && (
+          <section className="mt-7">
+            <h2 className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Rating</h2>
+            <div className="mt-2">
+              <OwnToggle label="Exclude from rating" checked={stored.exclude_from_rating === true} onChange={toggleExcluded} />
+            </div>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              Keeps it out of Ready to rank and the "rate it?" prompt, and it won't come up when you rank other shows or in Keep
+              comparing. You can still rank it yourself.
+            </p>
           </section>
         )}
 

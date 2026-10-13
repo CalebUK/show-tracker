@@ -27,6 +27,8 @@ export interface Show {
   own_streaming?: boolean
   /** "Stopped watching": still followed (stays in Shows and Rankings) but hidden from Tracking. */
   stopped?: boolean
+  /** "Exclude from rating": never suggested for rating or used when ranking other shows. It can still be ranked itself. */
+  exclude_from_rating?: boolean
   /** From TMDB: the next announced episode (often a season premiere), if there is one. */
   next_air?: { date: string; season: number; number: number } | null
   in_production?: boolean
