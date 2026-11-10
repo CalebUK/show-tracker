@@ -24,8 +24,12 @@ export default defineConfig({
         scope: '.',
         display: 'standalone',
         orientation: 'portrait',
-        theme_color: '#ffffff',
-        background_color: '#ffffff',
+        // The app's dark background. On Android, Chrome paints the system navigation bar (under the
+        // tab bar) with the manifest's theme_color, and a manifest can only have one colour, so it
+        // can't follow light/dark like the status bar does (that comes from the theme-color meta tag).
+        // Dark suits dark mode, where a white strip glares; background_color is the launch splash.
+        theme_color: '#0a0a0a',
+        background_color: '#0a0a0a',
         icons: [
           { src: 'pwa-64x64.png', sizes: '64x64', type: 'image/png' },
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
