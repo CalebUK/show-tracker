@@ -91,8 +91,13 @@ describe('isInProduction', () => {
 
 describe('nextSeasonNote', () => {
   it('uses the announced premiere date when TMDB has one', () => {
-    expect(nextSeasonNote({ ...base, next_air: { date: '2027-03-12', season: 6, number: 1 } })).toMatch(/^Season 6 starts /)
-    expect(nextSeasonNote({ ...base, next_air: { date: '2027-03-12', season: 5, number: 4 } })).toMatch(/^Next episode /)
+    expect(nextSeasonNote({ ...base, next_air: { date: '2027-03-12', season: 6, number: 1 } }, now)).toMatch(/^Season 6 starts /)
+    expect(nextSeasonNote({ ...base, next_air: { date: '2027-03-12', season: 5, number: 4 } }, now)).toMatch(/^Next episode /)
+  })
+
+  it('ignores a premiere date that has already passed', () => {
+    const stale = { ...base, next_air: { date: '2026-01-01', season: 2, number: 1 }, latest_season: 3, last_aired_season: 2 }
+    expect(nextSeasonNote(stale, now)).toBe('Season 3 announced, no date yet')
   })
 
   it('spots a season that is listed but not dated', () => {

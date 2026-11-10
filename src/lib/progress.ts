@@ -1,5 +1,5 @@
 import { episodeKey, type Episode, type Show, type Watched } from '../db'
-import { formatDateOnly, startOfDay } from './dates'
+import { formatDateOnly, localMidnight, startOfDay } from './dates'
 import { isOngoing } from './tmdb'
 
 /** Season, then episode number. Specials without a number go last in their season. */
@@ -92,9 +92,10 @@ export function isInProduction(show: Show) {
 }
 
 /** What TMDB knows about what's next, for shows with nothing on the schedule. */
-export function nextSeasonNote(show: Show) {
+export function nextSeasonNote(show: Show, now = new Date()) {
   const next = show.next_air
-  if (next?.date) {
+  // A date that's already passed is stale (TMDB placeholders like 1 January can linger), so skip it.
+  if (next?.date && Date.parse(localMidnight(next.date)) >= startOfDay(now).getTime()) {
     const when = formatDateOnly(next.date)
     return next.number === 1 ? `Season ${next.season} starts ${when}` : `Next episode ${when}`
   }

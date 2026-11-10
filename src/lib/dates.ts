@@ -2,6 +2,12 @@ import type { Episode, Show } from '../db'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
+/** "2027-07-09" → that day's local midnight as an ISO timestamp. */
+export function localMidnight(isoDate: string) {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  return new Date(y, m - 1, d).toISOString()
+}
+
 export function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
 }

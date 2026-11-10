@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, episodeKey, type Episode, type Show, type Watched } from '../db'
-import { startOfDay } from '../lib/dates'
+import { localMidnight, startOfDay } from '../lib/dates'
 import { progressFor, type Progress } from '../lib/progress'
 
 export interface Library {
@@ -16,12 +16,6 @@ export interface Library {
   progress: Map<number, Progress>
   /** Ticked episodes, by `episodeKey`. */
   watchedIds: Set<string>
-}
-
-/** "2027-07-09" → that day's local midnight as an ISO timestamp. */
-function localMidnight(isoDate: string) {
-  const [y, m, d] = isoDate.split('-').map(Number)
-  return new Date(y, m - 1, d).toISOString()
 }
 
 /** Everything the Tracking and Shows screens need, recomputed when the data or the day changes. */

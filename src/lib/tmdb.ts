@@ -259,18 +259,29 @@ function toDetails(d: TmdbDetails): ShowDetails {
   }
 }
 
+export interface TmdbEpisode {
+  runtime: number | null
+  /** "2026-10-22" */
+  air_date: string | null
+}
+
 /**
- * TMDB's per-episode runtimes, keyed "season:episode". These are the real lengths (Smallville 43),
- * where TVmaze often gives the TV slot (60). Up to 20 seasons come back in one request.
+ * TMDB's episodes for some seasons, keyed "season:episode": the real runtimes (Smallville 43, where
+ * TVmaze often gives the TV slot, 60), and air dates for episodes TVmaze hasn't dated. Up to 20
+ * seasons come back in one request.
  */
-export async function getEpisodeRuntimes(tmdbId: number, seasons: number[]): Promise<Map<string, number>> {
-  const out = new Map<string, number>()
+export async function getTmdbEpisodes(tmdbId: number, seasons: number[]): Promise<Map<string, TmdbEpisode>> {
+  const out = new Map<string, TmdbEpisode>()
   for (let i = 0; i < seasons.length; i += 20) {
     const batch = seasons.slice(i, i + 20)
     const data = await get<Record<string, unknown>>(`/tv/${tmdbId}`, { append_to_response: batch.map((n) => `season/${n}`).join(',') })
     for (const n of batch) {
-      const season = data[`season/${n}`] as { episodes?: { episode_number: number; runtime: number | null }[] } | undefined
-      for (const e of season?.episodes ?? []) if (e.runtime) out.set(`${n}:${e.episode_number}`, e.runtime)
+      const season = data[`season/${n}`] as
+        | { episodes?: { episode_number: number; runtime: number | null; air_date: string | null }[] }
+        | undefined
+      for (const e of season?.episodes ?? []) {
+        out.set(`${n}:${e.episode_number}`, { runtime: e.runtime || null, air_date: e.air_date || null })
+      }
     }
   }
   return out

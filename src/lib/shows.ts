@@ -1,5 +1,6 @@
 import { db, hasTicks, isOwned, type Episode, type Show } from '../db'
-import { getEpisodeRuntimes, getShowDetails, getTmdbKey, type ShowDetails } from './tmdb'
+import { localMidnight } from './dates'
+import { getShowDetails, getTmdbEpisodes, getTmdbKey, type ShowDetails } from './tmdb'
 import { getEpisodes, lookupTvmazeId, sleep } from './tvmaze'
 import { createStore } from './store'
 import { errorMessage } from './toast'
@@ -77,7 +78,11 @@ export async function refreshShow(tmdbId: number, prefetched?: ShowDetails) {
     tvmazeId = await lookup()
     episodes = tvmazeId ? await getEpisodes(tvmazeId, tmdbId) : null
   }
-  if (episodes) await addTmdbRuntimes(tmdbId, episodes)
+  if (episodes) {
+    await addTmdbDetails(tmdbId, episodes)
+    // No date from TVmaze or TMDB yet: leave it out until there is one.
+    episodes = episodes.filter((e) => e.airstamp)
+  }
 
   await db.transaction('rw', db.shows, db.episodes, async () => {
     const current = await db.shows.get(tmdbId)
@@ -128,32 +133,42 @@ export function refreshFollowed({ force = false } = {}): Promise<void> {
 }
 
 /**
- * Swap TVmaze's runtimes (often the TV slot, e.g. 60) for TMDB's real episode lengths (e.g. 43).
- * Episodes already checked keep their runtime, so only seasons with newly aired episodes are fetched.
- * Mutates `episodes`. If TMDB can't be reached, TVmaze's runtimes stay and it tries again next refresh.
+ * Fill in from TMDB what TVmaze's list lacks, in one request:
+ * - Air dates for episodes TVmaze hasn't dated (airstamp ''), e.g. a whole season dropped at once.
+ *   TMDB only has the day, so they're set to local midnight without a time.
+ * - Real runtimes (e.g. 43) for TVmaze's TV slot (e.g. 60). Episodes already checked keep theirs, so
+ *   only seasons with newly aired episodes are asked about.
+ * Mutates `episodes`. If TMDB can't be reached, nothing changes and it tries again next refresh.
  */
-async function addTmdbRuntimes(tmdbId: number, episodes: Episode[]) {
+async function addTmdbDetails(tmdbId: number, episodes: Episode[]) {
   const previous = new Map((await db.episodes.where('tmdb_show_id').equals(tmdbId).toArray()).map((e) => [`${e.season}:${e.number}`, e]))
   const now = Date.now()
   const seasons = new Set<number>()
   for (const e of episodes) {
     if (e.number == null || e.season < 1) continue
     const before = previous.get(`${e.season}:${e.number}`)
-    if (before?.runtime_checked) {
+    if (!e.airstamp) seasons.add(e.season)
+    else if (before?.runtime_checked) {
       e.runtime = before.runtime
       e.runtime_checked = true
     } else if (Date.parse(e.airstamp) <= now) seasons.add(e.season)
   }
   if (!seasons.size) return
   try {
-    const runtimes = await getEpisodeRuntimes(tmdbId, [...seasons])
+    const tmdb = await getTmdbEpisodes(tmdbId, [...seasons])
     for (const e of episodes) {
-      if (e.number == null || !seasons.has(e.season) || e.runtime_checked) continue
-      e.runtime = runtimes.get(`${e.season}:${e.number}`) ?? e.runtime
+      if (e.number == null || !seasons.has(e.season)) continue
+      const info = tmdb.get(`${e.season}:${e.number}`)
+      if (!e.airstamp && info?.air_date) {
+        e.airstamp = localMidnight(info.air_date)
+        e.has_time = false
+      }
+      if (!e.airstamp || e.runtime_checked) continue
+      e.runtime = info?.runtime ?? e.runtime
       // Only aired episodes count as checked; TMDB often fills in runtimes after an episode airs.
       if (Date.parse(e.airstamp) <= now) e.runtime_checked = true
     }
   } catch {
-    // Keep TVmaze's runtimes for now.
+    // Keep what TVmaze gave for now.
   }
 }

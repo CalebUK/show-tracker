@@ -8,7 +8,7 @@ import { ratingToScore } from './elo'
 import { ratePromptStore } from './ratePrompt'
 import { rankedPool, removeRanking, restoreRankings, saveComparison, saveRanking } from './ranking'
 import { refreshShow, setOwned, unfollow } from './shows'
-import { getEpisodeRuntimes, getShowDetails, type ShowDetails } from './tmdb'
+import { getShowDetails, getTmdbEpisodes, type ShowDetails } from './tmdb'
 import { getEpisodes, lookupTvmazeId } from './tvmaze'
 import { setWatched } from './watched'
 
@@ -16,7 +16,7 @@ import { setWatched } from './watched'
 vi.mock('./tmdb', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./tmdb')>()),
   getShowDetails: vi.fn(),
-  getEpisodeRuntimes: vi.fn(),
+  getTmdbEpisodes: vi.fn(),
 }))
 vi.mock('./tvmaze', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./tvmaze')>()),
@@ -284,10 +284,10 @@ describe('refreshing a show', () => {
     vi.mocked(getShowDetails).mockResolvedValue(details(60))
     // A fresh array each call, as the real API would give.
     vi.mocked(getEpisodes).mockImplementation(async () => tvmazeEpisodes())
-    vi.mocked(getEpisodeRuntimes).mockResolvedValue(
+    vi.mocked(getTmdbEpisodes).mockResolvedValue(
       new Map([
-        ['1:1', 43],
-        ['1:2', 44],
+        ['1:1', { runtime: 43, air_date: null }],
+        ['1:2', { runtime: 44, air_date: null }],
       ]),
     )
   })
@@ -295,14 +295,32 @@ describe('refreshing a show', () => {
   it("takes streaming services from the API and TMDB's real runtimes, asking TMDB only once", async () => {
     await refreshShow(60)
 
-    expect(getEpisodeRuntimes).toHaveBeenCalledWith(60, [1]) // only seasons that have aired
+    expect(getTmdbEpisodes).toHaveBeenCalledWith(60, [1]) // only seasons that have aired
     expect((await db.shows.get(60))?.streaming).toEqual([{ id: 8, name: 'Netflix', logo_path: null }])
     expect((await db.episodes.get(ep(60, 1, 1).id))?.runtime).toBe(43)
     expect((await db.episodes.get(ep(60, 2, 1).id))?.runtime).toBe(60) // not aired yet: TVmaze's for now
 
     await refreshShow(60)
-    expect(getEpisodeRuntimes).toHaveBeenCalledTimes(1)
+    expect(getTmdbEpisodes).toHaveBeenCalledTimes(1)
     expect((await db.episodes.get(ep(60, 1, 2).id))?.runtime).toBe(44)
+  })
+
+  it("dates episodes TVmaze hasn't dated from TMDB, and leaves out any neither has", async () => {
+    vi.mocked(getEpisodes).mockImplementation(async () => [
+      ...tvmazeEpisodes(),
+      ep(60, 3, 1, 0, { airstamp: '', runtime: 75 }),
+      ep(60, 3, 2, 0, { airstamp: '', runtime: 75 }),
+    ])
+    vi.mocked(getTmdbEpisodes).mockResolvedValue(new Map([['3:1', { runtime: 50, air_date: '2026-10-01' }]]))
+    await refreshShow(60)
+
+    expect(getTmdbEpisodes).toHaveBeenCalledWith(60, [1, 3])
+    expect(await db.episodes.get(ep(60, 3, 1).id)).toMatchObject({
+      airstamp: new Date(2026, 9, 1).toISOString(),
+      has_time: false,
+      runtime: 50,
+    })
+    expect(await db.episodes.get(ep(60, 3, 2).id)).toBeUndefined()
   })
 
   it('keeps your ticks when the episode list is replaced', async () => {

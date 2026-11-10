@@ -51,17 +51,18 @@ export async function getEpisodes(tvmazeId: number, tmdbShowId: number): Promise
   if (!list) return null
   const out: Episode[] = []
   for (const e of list) {
-    if (!e.airstamp) continue
-    const t = Date.parse(e.airstamp)
-    if (Number.isNaN(t)) continue
+    // TVmaze sometimes lists a season before dating it (often a streaming drop). Those come back
+    // with airstamp '' for refreshShow to date from TMDB; any it can't date are left out.
+    const t = e.airstamp ? Date.parse(e.airstamp) : NaN
+    const dated = !Number.isNaN(t)
     out.push({
       id: e.id,
       tmdb_show_id: tmdbShowId,
       season: e.season,
       number: e.number,
       name: e.name,
-      airstamp: new Date(t).toISOString(),
-      has_time: Boolean(e.airtime),
+      airstamp: dated ? new Date(t).toISOString() : '',
+      has_time: dated && Boolean(e.airtime),
       runtime: e.runtime ?? null,
     })
   }
