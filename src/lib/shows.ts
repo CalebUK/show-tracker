@@ -75,7 +75,8 @@ export async function refreshShow(tmdbId: number, prefetched?: ShowDetails) {
   const show = await db.shows.get(tmdbId)
   if (!show?.followed) return
   const details = prefetched ?? (await getShowDetails(tmdbId, { fresh: true }))
-  const lookup = () => lookupTvmazeId(details.show.imdb_id, details.tvdb_id)
+  const lookup = () =>
+    lookupTvmazeId(details.show.imdb_id, details.tvdb_id, { name: details.show.name, firstAired: details.first_air_date })
   let tvmazeId = show.tvmaze_id ?? (await lookup())
   let episodes = tvmazeId ? await getEpisodes(tvmazeId, tmdbId) : null
   // TVmaze no longer knows the saved id (shows get merged or re-added): look the show up again.

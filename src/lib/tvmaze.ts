@@ -19,8 +19,25 @@ async function get<T>(path: string): Promise<T | null> {
   throw new Error('TVmaze is rate limiting requests. Try again in a minute.')
 }
 
-/** Find the TVmaze show id from the IMDb id (falling back to TheTVDB id). */
-export async function lookupTvmazeId(imdbId: string | null, tvdbId: number | null): Promise<number | null> {
+const DAY = 24 * 60 * 60 * 1000
+
+/** Names compared loosely: case, punctuation and "&" vs "and" don't matter. */
+const sameName = (a: string, b: string) => {
+  const norm = (s: string) => s.toLowerCase().replace(/&/g, 'and').replace(/[^\p{L}\p{N}]/gu, '')
+  return norm(a) === norm(b)
+}
+
+/**
+ * Find the TVmaze show id from the IMDb id, then TheTVDB id. Some shows have neither on TMDB (e.g.
+ * "Monsters: The Lyle and Erik Menendez Story", split off from the Monster anthology), so as a last
+ * resort it searches by name, accepting only a show with the same name that premiered within a few
+ * days of TMDB's date: names alone aren't unique (TVmaze has four shows called "The Office").
+ */
+export async function lookupTvmazeId(
+  imdbId: string | null,
+  tvdbId: number | null,
+  byName?: { name: string; firstAired: string | null },
+): Promise<number | null> {
   if (imdbId) {
     const show = await get<{ id: number }>(`/lookup/shows?imdb=${encodeURIComponent(imdbId)}`)
     if (show) return show.id
@@ -28,6 +45,14 @@ export async function lookupTvmazeId(imdbId: string | null, tvdbId: number | nul
   if (tvdbId) {
     const show = await get<{ id: number }>(`/lookup/shows?thetvdb=${tvdbId}`)
     if (show) return show.id
+  }
+  if (byName?.firstAired) {
+    const wanted = Date.parse(byName.firstAired)
+    const results = (await get<{ show: { id: number; name: string; premiered: string | null } }[]>(`/search/shows?q=${encodeURIComponent(byName.name)}`)) ?? []
+    const match = results.find(
+      ({ show }) => sameName(show.name, byName.name) && show.premiered && Math.abs(Date.parse(show.premiered) - wanted) <= 3 * DAY,
+    )
+    if (match) return match.show.id
   }
   return null
 }

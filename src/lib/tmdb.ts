@@ -215,6 +215,8 @@ export interface ShowDetails {
   /** Fields that map straight onto a stored Show record. */
   show: Omit<Show, 'tvmaze_id' | 'followed' | 'followed_at' | 'last_refreshed_at' | 'own_dvd' | 'own_streaming'>
   tvdb_id: number | null
+  /** "2024-09-19": for matching on TVmaze by name when there are no shared ids. */
+  first_air_date: string | null
   /** TMDB's own idea of the next episode; used for shows that aren't followed (no TVmaze data yet). */
   next_episode: { air_date: string; season: number; number: number; name: string } | null
 }
@@ -278,6 +280,7 @@ function toDetails(d: TmdbDetails): ShowDetails {
       last_aired_season: d.last_episode_to_air?.season_number ?? null,
     },
     tvdb_id: d.external_ids?.tvdb_id ?? null,
+    first_air_date: d.first_air_date || null,
     next_episode: next?.air_date
       ? { air_date: next.air_date, season: next.season_number, number: next.episode_number, name: next.name }
       : null,

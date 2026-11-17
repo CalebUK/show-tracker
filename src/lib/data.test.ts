@@ -83,6 +83,7 @@ const details = (id: number, extra: Partial<ShowDetails['show']> = {}): ShowDeta
     ...extra,
   },
   tvdb_id: null,
+  first_air_date: null,
   next_episode: null,
 })
 
