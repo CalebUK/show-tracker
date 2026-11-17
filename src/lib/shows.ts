@@ -55,6 +55,11 @@ export async function setExcludedFromRating(tmdbId: number, excluded: boolean) {
   await db.shows.update(tmdbId, { exclude_from_rating: excluded })
 }
 
+/** Who's watching: one of your people, or null for you. */
+export async function setPerson(tmdbId: number, personId: string | null) {
+  await db.shows.update(tmdbId, { person: personId ?? undefined })
+}
+
 /** Tick or untick "Own on DVD" / "Own on streaming". Saves the show if it isn't stored yet. */
 export async function setOwned(tmdbId: number, field: 'own_dvd' | 'own_streaming', value: boolean) {
   const show = await loadShow(tmdbId)

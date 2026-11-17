@@ -1,5 +1,6 @@
 import type { BackupSettings } from './backup'
 import { onAirFilterStore, setOnAirFilter } from './onAir'
+import { peopleStore, setPeople } from './people'
 import { questionsStore, setQuestionSetting } from './ranking'
 import { myServicesStore, setMyServices } from './services'
 import { setThemePref, themeStore } from './theme'
@@ -14,6 +15,7 @@ export const currentSettings = (): BackupSettings => ({
   trackingView: defaultViewStore.get(),
   rankingQuestions: questionsStore.get(),
   theme: themeStore.get(),
+  people: peopleStore.get(),
 })
 
 /** Apply the settings from a backup. Any it doesn't have (older backups) stay as they are. */
@@ -24,4 +26,5 @@ export async function applySettings(s: BackupSettings) {
   if (s.trackingView) await setDefaultView(s.trackingView)
   if (s.rankingQuestions) await setQuestionSetting(s.rankingQuestions)
   if (s.theme) setThemePref(s.theme)
+  if (s.people) await setPeople(s.people)
 }

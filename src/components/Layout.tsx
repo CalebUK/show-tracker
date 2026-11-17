@@ -65,6 +65,15 @@ export function Overlay({ title, children, fallback = '/' }: { title?: string; c
   )
 }
 
+/** Who a show is for, on rows that aren't yours (Settings → People). */
+export function PersonPill({ name }: { name: string }) {
+  return (
+    <span className="max-w-32 shrink-0 truncate rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+      {name}
+    </span>
+  )
+}
+
 /** A row of filter chips, used under screen titles. Wraps rather than scrolling sideways. `value` null = none selected. */
 export function Chips<T extends string>({
   options,

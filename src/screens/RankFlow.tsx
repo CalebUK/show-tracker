@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type Bucket, type Show } from '../db'
+import { db, type Bucket, type Show, isKeptOutOfRating } from '../db'
 import { loadShow } from '../lib/shows'
 import { BUCKETS, questionsStore, rankedPool, saveRanking, sortRankings, type Opponent } from '../lib/ranking'
 import { K_OPPONENT, RANGES, eloUpdate, kFor, pickOpponent, questionCount, ratingToScore, rawScore, startingRating, suggestedBucket } from '../lib/elo'
@@ -133,7 +133,7 @@ export function RankFlow({ id }: { id: number }) {
           </div>
           {othersRanked === 0 && (
             <p className="mt-6 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-              There are no other ranked shows to compare it with yet (shows excluded from rating don't count). Rank a few more and
+              There are no other ranked shows to compare it with yet (shows kept out of rating don't count). Rank a few more and
               the questions start.
             </p>
           )}
@@ -259,7 +259,7 @@ export function ReadyToRank({ excludeId, title = 'Ready to rank' }: { excludeId?
     const rankedIds = new Set(ranked)
     const ids = (watched as number[]).filter((id) => id !== excludeId && !rankedIds.has(id))
     return (await db.shows.bulkGet(ids))
-      .filter((s): s is Show => !!s && !s.exclude_from_rating)
+      .filter((s): s is Show => !!s && !isKeptOutOfRating(s))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [excludeId])
 

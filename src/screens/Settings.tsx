@@ -25,13 +25,14 @@ import {
   useRegion,
   useTmdbKey,
 } from '../lib/tmdb'
-import { Button, ScreenHeader } from '../components/Layout'
-import { ChevronIcon, CoffeeIcon, Spinner } from '../components/Icons'
+import { Button, ScreenHeader, Switch } from '../components/Layout'
+import { ChevronIcon, CloseIcon, CoffeeIcon, Spinner } from '../components/Icons'
 import { setThemePref, themeStore, type ThemePref } from '../lib/theme'
 import { questionsStore, setQuestionSetting } from '../lib/ranking'
 import { onAirFilterStore, setOnAirFilter } from '../lib/onAir'
 import { defaultViewStore, setDefaultView } from '../lib/trackingView'
 import { myServicesStore, sameService, servicesOnShows, setServiceTicked } from '../lib/services'
+import { MAX_NAME, addPerson, countsInStats, peopleStore, removePerson, renamePerson, setPersonInStats, type Person } from '../lib/people'
 import { QUESTION_OPTIONS } from '../lib/elo'
 import { TmdbKeyForm, TmdbKeyHelp } from '../components/TmdbKeyForm'
 
@@ -164,6 +165,7 @@ export function Settings() {
         <TmdbKeySection />
         <RegionSection />
         <ServicesSection />
+        <PeopleSection />
         <OnAirSection />
         <TrackingViewSection />
         <RankingSection />
@@ -210,11 +212,18 @@ export function Settings() {
 /** Episodes watched and total time across every show, from ticks and episode runtimes. */
 function StatsSection() {
   const library = useLibrary(useNow())
+  const people = peopleStore.use()
   if (!library) return null
   let episodes = 0
   let minutes = 0
   let finished = 0
+  // Shows for people with "In my stats" off are left out.
+  const left = new Set<string>()
   for (const show of library.shows) {
+    if (!countsInStats(show, people)) {
+      left.add(people.find((p) => p.id === show.person)!.name)
+      continue
+    }
     const p = library.progress.get(show.tmdb_id)!
     episodes += p.watched
     minutes += p.minutesWatched ?? 0
@@ -227,6 +236,9 @@ function StatsSection() {
         <Stat value={minutes ? formatDuration(minutes) : '0m'} label="time watched" />
         <Stat value={finished.toLocaleString()} label={finished === 1 ? 'show finished' : 'shows finished'} />
       </div>
+      {left.size > 0 && (
+        <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">Not counting shows for {[...left].join(', ')}.</p>
+      )}
     </Section>
   )
 }
@@ -470,6 +482,111 @@ function ServiceRow({
         {detail && <span className="shrink-0 text-sm text-neutral-400">{detail}</span>}
       </label>
     </li>
+  )
+}
+
+function PeopleSection() {
+  const people = peopleStore.use()
+  const [name, setName] = useState('')
+  const counts = useLiveQuery(async () => {
+    const tagged = new Map<string, number>()
+    for (const s of await db.shows.toArray()) if (s.person) tagged.set(s.person, (tagged.get(s.person) ?? 0) + 1)
+    return tagged
+  }, [])
+
+  const add = async () => {
+    try {
+      await addPerson(name)
+      setName('')
+    } catch (err) {
+      toast(errorMessage(err))
+    }
+  }
+  const remove = async (person: Person) => {
+    const n = counts?.get(person.id) ?? 0
+    const shows = n ? ` Their ${n === 1 ? 'show goes' : `${n} shows go`} back to you.` : ''
+    if (!window.confirm(`Remove ${person.name}?${shows}`)) return
+    await removePerson(person.id)
+    toast(`Removed ${person.name}`)
+  }
+
+  return (
+    <Section title="People">
+      <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        Track shows for other people too, like your partner or kids. Tag a show with someone on its page under Who's watching: it
+        stays in Tracking with their name, never comes up for rating, and only counts in Your stats if you switch that on.
+      </p>
+      {people.length > 0 && (
+        <ul className="mt-2 divide-y divide-neutral-100 dark:divide-neutral-800">
+          {people.map((person) => (
+            <li key={person.id} className="flex items-center gap-3 py-2">
+              <div className="min-w-0 flex-1">
+                <PersonName person={person} />
+                <div className="text-xs text-neutral-400 tabular-nums">
+                  {counts?.get(person.id) ?? 0} show{counts?.get(person.id) === 1 ? '' : 's'}
+                </div>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+                In my stats
+                <Switch
+                  checked={person.inStats}
+                  onChange={(v) => setPersonInStats(person.id, v).catch((err) => toast(errorMessage(err)))}
+                  label={`Count ${person.name}'s shows in my stats`}
+                />
+              </label>
+              <button onClick={() => remove(person)} aria-label={`Remove ${person.name}`} className="rounded-full p-1.5 text-neutral-400 active:opacity-60">
+                <CloseIcon width={16} height={16} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          add()
+        }}
+        className="mt-3 flex gap-2"
+      >
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={MAX_NAME}
+          placeholder="Add a person, like Kids"
+          aria-label="Name"
+          className="h-11 min-w-0 flex-1 rounded-xl bg-neutral-100 px-3 text-base text-neutral-900 outline-none placeholder:text-neutral-400 focus:ring-2 focus:ring-accent dark:bg-neutral-800 dark:text-neutral-100"
+        />
+        <Button type="submit" variant="secondary" disabled={!name.trim()}>
+          Add
+        </Button>
+      </form>
+    </Section>
+  )
+}
+
+/** A person's name, renamed in place: tap, edit, then Enter or tap away. */
+function PersonName({ person }: { person: Person }) {
+  const [value, setValue] = useState(person.name)
+  useEffect(() => setValue(person.name), [person.name])
+  const save = async () => {
+    if (value.trim() === person.name) return setValue(person.name)
+    try {
+      await renamePerson(person.id, value)
+    } catch (err) {
+      toast(errorMessage(err))
+      setValue(person.name)
+    }
+  }
+  return (
+    <input
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+      maxLength={MAX_NAME}
+      aria-label={`Rename ${person.name}`}
+      className="-mx-1 w-full rounded-md bg-transparent px-1 text-[15px] text-neutral-900 outline-none focus:bg-neutral-100 dark:text-neutral-100 dark:focus:bg-neutral-800"
+    />
   )
 }
 

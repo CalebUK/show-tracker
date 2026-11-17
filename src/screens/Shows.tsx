@@ -4,9 +4,10 @@ import { episodeLabel, formatDuration, formatShortDate } from '../lib/dates'
 import { isFinished, nextSeasonNote, type Progress } from '../lib/progress'
 import { navigate } from '../lib/router'
 import { canStream, myServicesStore, whereToWatch } from '../lib/services'
+import { peopleStore, personFor } from '../lib/people'
 import { useLibrary } from '../hooks/useLibrary'
 import { useNow } from '../hooks/useNow'
-import { Button, Chips, EmptyState, ScreenHeader, Switch } from '../components/Layout'
+import { Button, Chips, EmptyState, PersonPill, ScreenHeader, Switch } from '../components/Layout'
 import { Poster } from '../components/Poster'
 import { CloseIcon, PlusIcon, SearchIcon } from '../components/Icons'
 
@@ -21,6 +22,8 @@ const doneShare = (p: Progress) => (p.aired ? (p.aired - p.left) / p.aired : 0)
 // Kept outside the component so switching tabs doesn't reset the filter or search. null = everything.
 let lastFilter: Filter | null = null
 let lastQuery = ''
+/** Whose shows: 'everyone', 'me', or a person's id (Settings → People). */
+let lastWho = 'everyone'
 
 /** Lower case without accents, so "pokemon" finds "Pokémon". */
 const fold = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
@@ -51,6 +54,12 @@ export function Shows() {
   const setFilter = (f: Filter) => setFilterState((lastFilter = f === filter ? null : f))
   const [query, setQueryState] = useState(lastQuery)
   const setQuery = (q: string) => setQueryState((lastQuery = q))
+  const people = peopleStore.use()
+  const [whoState, setWhoState] = useState(lastWho)
+  const setWho = (w: string) => setWhoState((lastWho = w))
+  // Back to everyone if the chosen person has been removed.
+  const who = whoState === 'me' || people.some((p) => p.id === whoState) ? whoState : 'everyone'
+  const whoName = who === 'me' ? 'you' : people.find((p) => p.id === who)?.name
   const [hideDone, setHideState] = useState(loadHide)
   const setHide = (v: boolean) => {
     saveHide(v)
@@ -59,7 +68,9 @@ export function Shows() {
 
   const progress = (s: Show) => library!.progress.get(s.tmdb_id)!
   const finished = (s: Show) => isFinished(s, progress(s))
-  const all = library?.followed ?? []
+  const followed = library?.followed ?? []
+  const all =
+    who === 'everyone' ? followed : followed.filter((s) => (who === 'me' ? !personFor(s, people) : s.person === who))
   const lists = library && {
     // On one of your services (Settings → Streaming services), or owned on DVD or streaming.
     stream: all.filter((s) => canStream(s, myServices)),
@@ -68,7 +79,7 @@ export function Shows() {
     finished: all.filter((s) => finished(s) || s.stopped),
     almostDone: all.filter((s) => !s.stopped && progress(s).started && progress(s).left > 0 && doneShare(progress(s)) >= ALMOST_DONE),
   }
-  const hasAny = all.length > 0
+  const hasAny = followed.length > 0
   const filtered = filter ? (lists?.[filter] ?? []) : all
   // Finished: most time spent first (a finished show's whole length, or what you watched before
   // stopping). Almost done: closest to the end first. The rest A–Z.
@@ -89,6 +100,7 @@ export function Shows() {
   const shows = canHide && hideDone ? listed.filter((s) => !isDone(s)) : listed
   const hiddenCount = listed.length - shows.length
   const noMatch = q !== '' && listed.length === 0
+  const noneForWho = who !== 'everyone' && all.length === 0
 
   return (
     <>
@@ -151,10 +163,29 @@ export function Shows() {
               value={filter}
               onChange={setFilter}
             />
-            <p className="px-5 pb-3 text-sm text-neutral-400 tabular-nums">
-              {shows.length} show{shows.length === 1 ? '' : 's'}
-              {hiddenCount > 0 && ` · ${hiddenCount} done hidden`}
-            </p>
+            <div className="flex items-center justify-between gap-3 px-5 pb-3 text-sm">
+              <p className="text-neutral-400 tabular-nums">
+                {shows.length} show{shows.length === 1 ? '' : 's'}
+                {hiddenCount > 0 && ` · ${hiddenCount} done hidden`}
+              </p>
+              {/* Only once there's someone besides you (Settings → People). */}
+              {people.length > 0 && (
+                <select
+                  value={who}
+                  onChange={(e) => setWho(e.target.value)}
+                  aria-label="Whose shows"
+                  className="max-w-40 truncate bg-transparent text-right font-medium text-accent-text outline-none"
+                >
+                  <option value="everyone">Everyone</option>
+                  <option value="me">Me</option>
+                  {people.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
           </>
         )}
       </ScreenHeader>
@@ -168,9 +199,15 @@ export function Shows() {
       ) : lists && shows.length === 0 ? (
         <div className="px-5 pt-8">
           <p className="text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-            {noMatch ? `No shows here match “${query.trim()}”.` : emptyMessage(filter, hiddenCount, myServices.length > 0)}
+            {noneForWho
+              ? who === 'me'
+                ? 'Every show you follow is tagged for someone else.'
+                : `No shows are tagged for ${whoName} yet. Tag one on its page under Who's watching.`
+              : noMatch
+                ? `No shows here match “${query.trim()}”.`
+                : emptyMessage(filter, hiddenCount, myServices.length > 0)}
           </p>
-          {filter === 'stream' && !noMatch && hiddenCount === 0 && (
+          {filter === 'stream' && !noneForWho && !noMatch && hiddenCount === 0 && (
             <Button variant="secondary" className="mt-4" onClick={() => navigate('/settings', { replace: true })}>
               Choose your services
             </Button>
@@ -203,7 +240,12 @@ export function Shows() {
                         ? finishedLine(show, progress(show))
                         : statusLine(show, progress(show), library!.nextUp.get(show.tmdb_id), now)}
                   </div>
-                  {filter === 'stream' && <div className="truncate text-xs text-accent-text">{whereToWatch(show, myServices)}</div>}
+                  {(filter === 'stream' || (who === 'everyone' && personFor(show, people))) && (
+                    <div className="mt-0.5 flex min-w-0 items-center gap-2">
+                      {who === 'everyone' && personFor(show, people) && <PersonPill name={personFor(show, people)!.name} />}
+                      {filter === 'stream' && <span className="truncate text-xs text-accent-text">{whereToWatch(show, myServices)}</span>}
+                    </div>
+                  )}
                 </div>
               </button>
             </li>

@@ -1,4 +1,4 @@
-import { db, getMeta, hasTicks, isOwned, setMeta, type Bucket, type Ranking, type Show } from '../db'
+import { db, getMeta, hasTicks, isOwned, setMeta, type Bucket, type Ranking, type Show, isKeptOutOfRating } from '../db'
 import { DEFAULT_QUESTIONS, K_KEEP, QUESTION_OPTIONS, eloUpdate, ratingToScore, type QuestionSetting } from './elo'
 import { createStore } from './store'
 
@@ -34,12 +34,12 @@ export interface Opponent {
   rating: number
 }
 
-/** Every ranked show except one, as candidates to compare against. Shows excluded from rating never are. */
+/** Every ranked show except one, as candidates to compare against. Shows kept out of rating never are. */
 export async function rankedPool(excludeId: number): Promise<Opponent[]> {
   const rankings = (await db.rankings.toArray()).filter((r) => r.tmdb_show_id !== excludeId)
   const shows = await db.shows.bulkGet(rankings.map((r) => r.tmdb_show_id))
   return rankings.flatMap((r, i) =>
-    shows[i]?.exclude_from_rating
+    shows[i] && isKeptOutOfRating(shows[i])
       ? []
       : [{ id: r.tmdb_show_id, name: shows[i]?.name ?? 'Unknown show', poster_path: shows[i]?.poster_path ?? null, bucket: r.bucket, rating: r.rating }],
   )

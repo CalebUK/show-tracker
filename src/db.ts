@@ -29,6 +29,8 @@ export interface Show {
   stopped?: boolean
   /** "Exclude from rating": never suggested for rating or used when ranking other shows. It can still be ranked itself. */
   exclude_from_rating?: boolean
+  /** Who's watching: one of your people (Settings → People). Unset = you. */
+  person?: string
   /** From TMDB: the next announced episode (often a season premiere), if there is one. */
   next_air?: { date: string; season: number; number: number } | null
   in_production?: boolean
@@ -39,6 +41,9 @@ export interface Show {
 }
 
 export const isOwned = (s: Show) => s.own_dvd === true || s.own_streaming === true
+
+/** Kept out of rating suggestions and comparisons: excluded by hand, or tagged for someone else. */
+export const isKeptOutOfRating = (s: Show) => s.exclude_from_rating === true || !!s.person
 
 export interface Episode {
   /** TVmaze episode id */

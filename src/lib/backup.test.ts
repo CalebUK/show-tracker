@@ -58,6 +58,7 @@ describe('settings in backups', () => {
     trackingView: 'onair',
     rankingQuestions: 'all',
     theme: 'dark',
+    people: [{ id: 'kids', name: 'Kids', inStats: false }],
   }
 
   it('reads them from version 4', () => {
@@ -69,9 +70,18 @@ describe('settings in backups', () => {
   })
 
   it('drops anything malformed instead of rejecting the backup', () => {
-    const junk = { region: 'Britain', services: [{ id: 'x' }, { id: 9, name: 'Prime' }, null], onAirFilter: 'some', trackingView: 1, rankingQuestions: 7, theme: 'pink' }
+    const junk = {
+      region: 'Britain',
+      services: [{ id: 'x' }, { id: 9, name: 'Prime' }, null],
+      onAirFilter: 'some',
+      trackingView: 1,
+      rankingQuestions: 7,
+      theme: 'pink',
+      people: [{ id: 'a', name: '  ' }, { id: 'b', name: 'Wife', inStats: 'yes' }, 'Kids'],
+    }
     expect(parseBackup(JSON.stringify({ ...valid, version: 4, settings: junk })).settings).toEqual({
       services: [{ id: 9, name: 'Prime', logo_path: null }],
+      people: [{ id: 'b', name: 'Wife', inStats: false }],
     })
     expect(parseBackup(JSON.stringify({ ...valid, version: 4, settings: { region: '' } })).settings).toEqual({ region: '' })
   })

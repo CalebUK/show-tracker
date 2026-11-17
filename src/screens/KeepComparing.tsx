@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type Ranking } from '../db'
+import { db, isKeptOutOfRating, type Ranking } from '../db'
 import { pairKey, randomPair } from '../lib/elo'
 import { restoreRankings, saveComparison } from '../lib/ranking'
 import { goBack, navigate } from '../lib/router'
@@ -20,10 +20,10 @@ export function KeepComparing() {
   const data = useLiveQuery(async () => {
     const rankings = await db.rankings.toArray()
     const shows = await db.shows.bulkGet(rankings.map((r) => r.tmdb_show_id))
-    // Shows excluded from rating never come up.
+    // Shows kept out of rating never come up.
     return new Map(
       rankings.flatMap((r, i): [number, { name: string; poster: string | null }][] =>
-        shows[i]?.exclude_from_rating ? [] : [[r.tmdb_show_id, { name: shows[i]?.name ?? 'Unknown show', poster: shows[i]?.poster_path ?? null }]],
+        shows[i] && isKeptOutOfRating(shows[i]) ? [] : [[r.tmdb_show_id, { name: shows[i]?.name ?? 'Unknown show', poster: shows[i]?.poster_path ?? null }]],
       ),
     )
   }, [])

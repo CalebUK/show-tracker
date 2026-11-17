@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Episode, type Show } from '../db'
+import { peopleStore, personFor } from '../lib/people'
 import { getShowDetails, logoUrl, regionName, useRegion, type ShowDetails } from '../lib/tmdb'
-import { follow, setExcludedFromRating, setOwned, setStopped, unfollow } from '../lib/shows'
+import { follow, setExcludedFromRating, setOwned, setPerson, setStopped, unfollow } from '../lib/shows'
 import { BUCKETS, removeRanking, sortRankings } from '../lib/ranking'
 import { episodeLabel, formatAirTime, formatDateOnly } from '../lib/dates'
 import { navigate } from '../lib/router'
@@ -59,6 +60,7 @@ export function ShowDetail({ id }: { id: number }) {
 
   const [busy, setBusy] = useState(false)
   const [showAllStreaming, setShowAllStreaming] = useState(false)
+  const people = peopleStore.use()
   const show = stored ?? (details ? { ...details.show, followed: false } : null)
 
   if (!show) {
@@ -110,6 +112,16 @@ export function ShowDetail({ id }: { id: number }) {
     try {
       await setStopped(id, value)
       toast(value ? `${show.name} is hidden from Tracking` : `${show.name} is back on Tracking`)
+    } catch (err) {
+      toast(errorMessage(err))
+    }
+  }
+
+  const choosePerson = async (personId: string | null) => {
+    try {
+      await setPerson(id, personId)
+      const person = people.find((p) => p.id === personId)
+      toast(person ? `${show.name} is now for ${person.name}` : `${show.name} is yours again`)
     } catch (err) {
       toast(errorMessage(err))
     }
@@ -237,16 +249,37 @@ export function ShowDetail({ id }: { id: number }) {
           </section>
         )}
 
+        {stored && people.length > 0 && (
+          <section className="mt-7">
+            <h2 className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Who's watching</h2>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <ToggleChip label="Me" pressed={!personFor(stored, people)} onChange={() => choosePerson(null)} />
+              {people.map((p) => (
+                <ToggleChip key={p.id} label={p.name} pressed={stored.person === p.id} onChange={() => choosePerson(p.id)} />
+              ))}
+            </div>
+          </section>
+        )}
+
         {stored && (
           <section className="mt-7">
             <h2 className="text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">Rating</h2>
-            <div className="mt-2">
-              <OwnToggle label="Exclude from rating" checked={stored.exclude_from_rating === true} onChange={toggleExcluded} />
-            </div>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">
-              Keeps it out of Ready to rank and the "rate it?" prompt, and it won't come up when you rank other shows or in Keep
-              comparing. You can still rank it yourself.
-            </p>
+            {personFor(stored, people) ? (
+              <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+                Tagged for {personFor(stored, people)!.name}, so it's kept out of Ready to rank and the "rate it?" prompt, and won't
+                come up when you rank other shows. You can still rank it yourself.
+              </p>
+            ) : (
+              <>
+                <div className="mt-2">
+                  <OwnToggle label="Exclude from rating" checked={stored.exclude_from_rating === true} onChange={toggleExcluded} />
+                </div>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                  Keeps it out of Ready to rank and the "rate it?" prompt, and it won't come up when you rank other shows or in Keep
+                  comparing. You can still rank it yourself.
+                </p>
+              </>
+            )}
           </section>
         )}
 

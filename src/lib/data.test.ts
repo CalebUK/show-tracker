@@ -6,6 +6,7 @@ import { db, episodeKey, type Bucket, type Episode, type Ranking, type Show } fr
 import { buildBackup, parseBackup, restoreBackup } from './backup'
 import { ratingToScore } from './elo'
 import { ratePromptStore } from './ratePrompt'
+import { addPerson, countsInStats, peopleStore, removePerson, setPeople } from './people'
 import { rankedPool, removeRanking, restoreRankings, saveComparison, saveRanking } from './ranking'
 import { refreshShow, setOwned, unfollow } from './shows'
 import { getShowDetails, getTmdbEpisodes, type ShowDetails } from './tmdb'
@@ -176,9 +177,9 @@ describe('rankings', () => {
     expect(await db.rankings.get(20)).toMatchObject({ rating: 1830, comparisons: 1, score: 8.3 })
   })
 
-  it('never uses a show excluded from rating as a comparison', async () => {
-    await db.shows.bulkPut([show(23), show(24, { exclude_from_rating: true }), show(25)])
-    await db.rankings.bulkPut([ranking(23, 'liked', 1840), ranking(24, 'liked', 1840), ranking(25, 'fine', 1500)])
+  it('never uses a show excluded from rating, or tagged for someone else, as a comparison', async () => {
+    await db.shows.bulkPut([show(23), show(24, { exclude_from_rating: true }), show(25), show(26, { person: 'kids' })])
+    await db.rankings.bulkPut([ranking(23, 'liked', 1840), ranking(24, 'liked', 1840), ranking(25, 'fine', 1500), ranking(26, 'liked', 1840)])
     expect((await rankedPool(25)).map((o) => o.id)).toEqual([23])
   })
 
@@ -227,6 +228,12 @@ describe('rate when finished', () => {
     expect(ratePromptStore.get()).toBeNull()
   })
 
+  it("doesn't offer for a show tagged for someone else", async () => {
+    await db.shows.update(40, { person: 'kids' })
+    await setWatched([ep(40, 1, 1), ep(40, 1, 2)], true)
+    expect(ratePromptStore.get()).toBeNull()
+  })
+
   it("doesn't offer for a show excluded from rating", async () => {
     await db.shows.update(40, { exclude_from_rating: true })
     await setWatched([ep(40, 1, 1), ep(40, 1, 2)], true)
@@ -240,9 +247,40 @@ describe('rate when finished', () => {
   })
 })
 
+describe('people', () => {
+  beforeEach(() => peopleStore.set([]))
+
+  it('adds people, refusing blanks and repeats', async () => {
+    await addPerson('  Kids ')
+    await expect(addPerson('kids')).rejects.toThrow(/already on the list/)
+    await expect(addPerson('   ')).rejects.toThrow(/Enter a name/)
+    expect(peopleStore.get()).toMatchObject([{ name: 'Kids', inStats: false }])
+  })
+
+  it('counts your shows, and those of people with In my stats on', async () => {
+    const people = [
+      { id: 'wife', name: 'Wife', inStats: true },
+      { id: 'kids', name: 'Kids', inStats: false },
+    ]
+    expect(countsInStats(show(1), people)).toBe(true)
+    expect(countsInStats(show(2, { person: 'wife' }), people)).toBe(true)
+    expect(countsInStats(show(3, { person: 'kids' }), people)).toBe(false)
+    expect(countsInStats(show(4, { person: 'gone' }), people)).toBe(true) // no longer listed: yours
+  })
+
+  it("gives someone's shows back to you when they're removed", async () => {
+    await setPeople([{ id: 'kids', name: 'Kids', inStats: false }])
+    await db.shows.bulkPut([show(1, { person: 'kids' }), show(2, { person: 'wife' })])
+    await removePerson('kids')
+    expect((await db.shows.get(1))?.person).toBeUndefined()
+    expect((await db.shows.get(2))?.person).toBe('wife')
+    expect(peopleStore.get()).toEqual([])
+  })
+})
+
 describe('backups', () => {
   it('round-trips shows, episodes, rankings and ticks, but not "where to stream"', async () => {
-    await db.shows.put(show(50, { streaming: [{ id: 8, name: 'Netflix', logo_path: null }], own_dvd: true, exclude_from_rating: true }))
+    await db.shows.put(show(50, { streaming: [{ id: 8, name: 'Netflix', logo_path: null }], own_dvd: true, exclude_from_rating: true, person: 'kids' }))
     await db.episodes.bulkPut([ep(50, 1, 1, 30, { runtime: 43, runtime_checked: true })])
     await db.rankings.put(ranking(50, 'liked', 1900))
     await setWatched([ep(50, 1, 1)], true, { promptToRate: false })
@@ -256,7 +294,7 @@ describe('backups', () => {
     await restoreBackup(parseBackup(text))
 
     expect(await db.shows.get(99)).toBeUndefined()
-    expect(await db.shows.get(50)).toMatchObject({ own_dvd: true, exclude_from_rating: true, streaming: [] })
+    expect(await db.shows.get(50)).toMatchObject({ own_dvd: true, exclude_from_rating: true, person: 'kids', streaming: [] })
     expect(await db.episodes.get(ep(50, 1, 1).id)).toMatchObject({ runtime: 43, runtime_checked: true })
     expect(await db.rankings.get(50)).toMatchObject({ rating: 1900, score: 9 })
     expect(await db.watched.get(episodeKey(50, 1, 1))).toBeDefined()

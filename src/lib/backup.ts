@@ -1,6 +1,7 @@
 import { db, episodeKey, setMeta, type Bucket, type Episode, type Provider, type Ranking, type Show, type Watched } from '../db'
 import { QUESTION_OPTIONS, ratingToScore, scoreToRating, startingRating, type QuestionSetting } from './elo'
 import type { OnAirFilter } from './onAir'
+import type { Person } from './people'
 import type { ThemePref } from './theme'
 import type { TrackingView } from './trackingView'
 
@@ -13,6 +14,7 @@ export interface BackupSettings {
   trackingView?: TrackingView
   rankingQuestions?: QuestionSetting
   theme?: ThemePref
+  people?: Person[]
 }
 
 export interface BackupFile {
@@ -127,6 +129,7 @@ export function parseBackup(text: string): BackupFile {
       own_streaming: s.own_streaming === true,
       stopped: s.stopped === true,
       exclude_from_rating: s.exclude_from_rating === true,
+      person: typeof s.person === 'string' && s.person ? s.person : undefined,
       // TMDB's next-season info; refreshed from TMDB anyway, so only kept if well-formed.
       next_air:
         isObj(s.next_air) && typeof s.next_air.date === 'string' && num(s.next_air.season) && num(s.next_air.number)
@@ -219,6 +222,14 @@ function parseSettings(v: unknown): BackupSettings {
   if (TRACKING_VIEWS.includes(v.trackingView as TrackingView)) out.trackingView = v.trackingView as TrackingView
   if (QUESTION_OPTIONS.includes(v.rankingQuestions as QuestionSetting)) out.rankingQuestions = v.rankingQuestions as QuestionSetting
   if (THEMES.includes(v.theme as ThemePref)) out.theme = v.theme as ThemePref
+  if (Array.isArray(v.people)) {
+    out.people = []
+    for (const p of v.people) {
+      if (isObj(p) && typeof p.id === 'string' && p.id && typeof p.name === 'string' && p.name.trim()) {
+        out.people.push({ id: p.id, name: p.name.trim().slice(0, 30), inStats: p.inStats === true })
+      }
+    }
+  }
   return out
 }
 

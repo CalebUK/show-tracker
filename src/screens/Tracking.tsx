@@ -7,12 +7,13 @@ import { setWatched } from '../lib/watched'
 import { getTmdbKey } from '../lib/tmdb'
 import { isOnCurrentSeason, onAirFilterStore } from '../lib/onAir'
 import { defaultViewStore, type TrackingView } from '../lib/trackingView'
+import { peopleStore, type Person } from '../lib/people'
 import { navigate } from '../lib/router'
 import { errorMessage, toast } from '../lib/toast'
 import { isWatched, useLibrary } from '../hooks/useLibrary'
 import { useNow } from '../hooks/useNow'
 import { useOnline } from '../hooks/useOnline'
-import { Button, Chips, EmptyState, ScreenHeader } from '../components/Layout'
+import { Button, Chips, EmptyState, PersonPill, ScreenHeader } from '../components/Layout'
 import { PullToRefresh } from '../components/PullToRefresh'
 import { Poster } from '../components/Poster'
 import { CheckIcon, ChevronIcon, RefreshIcon, Spinner } from '../components/Icons'
@@ -285,6 +286,7 @@ function QuietRow({
 }) {
   const behind = progress?.started && progress.left > 0
   const catchUp = progress && catchUpLine(progress)
+  const person = usePerson(show)
   return (
     <li className="list-none">
       <button
@@ -295,8 +297,9 @@ function QuietRow({
         <div className="min-w-0 flex-1">
           <ShowName name={show.name} className="text-neutral-700 dark:text-neutral-200" />
           <div className="truncate text-sm text-neutral-500 tabular-nums dark:text-neutral-400">{detail}</div>
-          {(catchUp || airing) && (
+          {(catchUp || airing || person) && (
             <div className="mt-0.5 flex items-center gap-2 text-xs tabular-nums">
+              {person && <PersonPill name={person.name} />}
               {airing && <AiringPill />}
               {catchUp && <span className={behind ? 'font-medium text-accent-text' : 'text-neutral-400'}>{catchUp}</span>}
             </div>
@@ -322,6 +325,7 @@ function EpisodeRow({ row, group, now }: { row: UpcomingRow; group: keyof Upcomi
   const ep = row.episodes[0]
   const aired = row.episodes.every((e) => isAired(e, now))
   const title = row.episodes.length > 1 ? `${row.episodes.length} episodes` : ep.name
+  const person = usePerson(row.show)
   return (
     <li className="flex items-center gap-2 pr-4">
       <button
@@ -335,6 +339,11 @@ function EpisodeRow({ row, group, now }: { row: UpcomingRow; group: keyof Upcomi
             <span className="tabular-nums">{episodeLabel(row.episodes)}</span>
             {title ? ` · ${title}` : ''}
           </div>
+          {person && (
+            <div className="mt-0.5 flex">
+              <PersonPill name={person.name} />
+            </div>
+          )}
         </div>
         <div className={`shrink-0 text-right text-sm tabular-nums ${aired ? 'text-neutral-400' : 'text-neutral-700 dark:text-neutral-200'}`}>
           {aired ? 'Aired' : formatAirTime(ep, group)}
@@ -363,6 +372,7 @@ function UpNextRow({
 }) {
   const ep = progress.next
   const left = ep && progress.started ? `${progress.left} left` : null
+  const person = usePerson(show)
   return (
     <li className={`flex items-center gap-2 ${inPanel ? 'pr-2' : 'pr-4'}`}>
       <button
@@ -384,8 +394,9 @@ function UpNextRow({
               emptyText
             )}
           </div>
-          {(airing || left) && (
+          {(airing || left || person) && (
             <div className="mt-0.5 flex items-center gap-2 text-xs text-neutral-400">
+              {person && <PersonPill name={person.name} />}
               {airing && <AiringPill />}
               {left}
             </div>
@@ -395,6 +406,12 @@ function UpNextRow({
       {ep && <TickButton episodes={[ep]} showName={show.name} />}
     </li>
   )
+}
+
+/** Who a show is for, if it isn't yours (Settings → People). */
+function usePerson(show: Show): Person | null {
+  const people = peopleStore.use()
+  return show.person ? (people.find((p) => p.id === show.person) ?? null) : null
 }
 
 /** Long titles get two lines rather than being cut off after a few words. */

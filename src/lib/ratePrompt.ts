@@ -1,4 +1,4 @@
-import { db } from '../db'
+import { db, isKeptOutOfRating } from '../db'
 import { isFinished, progressFor } from './progress'
 import { createStore } from './store'
 
@@ -13,7 +13,7 @@ export async function offerRatingIfFinished(showIds: number[]) {
   for (const id of new Set(showIds)) {
     if (await db.rankings.get(id)) continue
     const show = await db.shows.get(id)
-    if (!show || show.exclude_from_rating) continue
+    if (!show || isKeptOutOfRating(show)) continue
     const [episodes, watched] = await Promise.all([
       db.episodes.where('tmdb_show_id').equals(id).toArray(),
       db.watched.where('tmdb_show_id').equals(id).toArray(),
