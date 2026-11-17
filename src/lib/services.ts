@@ -55,9 +55,11 @@ export function foldVariants(list: Provider[]) {
   )
 }
 
+/** Your services among a list of providers. */
+export const servicesAmong = (providers: Provider[], mine: Provider[]) => mine.filter((s) => providers.some((p) => sameService(p, s)))
+
 /** Your services that a show is on. */
-export const servicesFor = (show: Show, mine: Provider[]) =>
-  mine.filter((s) => (show.streaming ?? []).some((p) => sameService(p, s)))
+export const servicesFor = (show: Show, mine: Provider[]) => servicesAmong(show.streaming ?? [], mine)
 
 /** On one of your services, or you own it on DVD or streaming. */
 export const canStream = (show: Show, mine: Provider[]) => isOwned(show) || servicesFor(show, mine).length > 0

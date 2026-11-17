@@ -15,6 +15,8 @@ export interface BackupSettings {
   rankingQuestions?: QuestionSetting
   theme?: ThemePref
   people?: Person[]
+  /** Suggestions you've said you're not interested in (TMDB ids). */
+  hiddenSuggestions?: number[]
 }
 
 export interface BackupFile {
@@ -222,6 +224,7 @@ function parseSettings(v: unknown): BackupSettings {
   if (TRACKING_VIEWS.includes(v.trackingView as TrackingView)) out.trackingView = v.trackingView as TrackingView
   if (QUESTION_OPTIONS.includes(v.rankingQuestions as QuestionSetting)) out.rankingQuestions = v.rankingQuestions as QuestionSetting
   if (THEMES.includes(v.theme as ThemePref)) out.theme = v.theme as ThemePref
+  if (Array.isArray(v.hiddenSuggestions)) out.hiddenSuggestions = v.hiddenSuggestions.filter((id): id is number => num(id))
   if (Array.isArray(v.people)) {
     out.people = []
     for (const p of v.people) {

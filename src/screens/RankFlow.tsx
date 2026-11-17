@@ -267,7 +267,8 @@ export function ReadyToRank({ excludeId, title = 'Ready to rank' }: { excludeId?
   return (
     <section className="mt-10 w-full text-left">
       <h2 className="px-1 text-xs font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">{title}</h2>
-      <ul className="mt-3 flex gap-3 overflow-x-auto pb-2">
+      {/* Scrolls sideways, so a swipe here shouldn't flip Rankings to Suggestions. */}
+      <ul data-no-swipe className="mt-3 flex gap-3 overflow-x-auto pb-2">
         {shows.map((s) => (
           <li key={s.tmdb_id} className="w-20 shrink-0">
             <button onClick={() => navigate(`/rank/${s.tmdb_id}`, { replace: excludeId != null })} className="w-full text-left">

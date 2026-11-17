@@ -24,6 +24,30 @@
 @theme {
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --animate-slide-in: slide-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Rankings ↔ Suggestions: the new view slides in from the side you're heading to. */
+  --animate-from-right: from-right 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-from-left: from-left 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  @keyframes from-right {
+    from {
+      transform: translateX(32px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+  @keyframes from-left {
+    from {
+      transform: translateX(-32px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
 
   @keyframes slide-in {
     from {

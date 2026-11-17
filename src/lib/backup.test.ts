@@ -59,6 +59,7 @@ describe('settings in backups', () => {
     rankingQuestions: 'all',
     theme: 'dark',
     people: [{ id: 'kids', name: 'Kids', inStats: false }],
+    hiddenSuggestions: [1396, 66732],
   }
 
   it('reads them from version 4', () => {

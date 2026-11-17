@@ -4,7 +4,7 @@ import { addMonths, episodeLabel, formatAirTime, formatShortDate, groupUpcoming,
 import { isAired, isFinished, isInProduction, nextSeasonNote, type Progress } from '../lib/progress'
 import { refreshFollowed, refreshStore } from '../lib/shows'
 import { setWatched } from '../lib/watched'
-import { getTmdbKey, logoUrl } from '../lib/tmdb'
+import { getTmdbKey } from '../lib/tmdb'
 import { isOnCurrentSeason, onAirFilterStore } from '../lib/onAir'
 import { defaultViewStore, type TrackingView } from '../lib/trackingView'
 import { peopleStore, type Person } from '../lib/people'
@@ -14,7 +14,7 @@ import { errorMessage, toast } from '../lib/toast'
 import { isWatched, useLibrary } from '../hooks/useLibrary'
 import { useNow } from '../hooks/useNow'
 import { useOnline } from '../hooks/useOnline'
-import { Button, Chips, EmptyState, PersonPill, ScreenHeader } from '../components/Layout'
+import { Button, Chips, EmptyState, PersonPill, ScreenHeader, ServicePill } from '../components/Layout'
 import { PullToRefresh } from '../components/PullToRefresh'
 import { Poster } from '../components/Poster'
 import { CheckIcon, ChevronIcon, RefreshIcon, Spinner } from '../components/Icons'
@@ -446,24 +446,6 @@ function ChannelPill({ name }: { name: string }) {
   return (
     <span className="max-w-36 shrink-0 truncate rounded-full border border-neutral-200 px-2 py-px text-[11px] font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
       {name}
-    </span>
-  )
-}
-
-/** Where to watch it: the first of your services it's on, with "+1" for any more. */
-function ServicePill({ services }: { services: Provider[] }) {
-  const [first, ...rest] = services
-  return (
-    <span
-      className={`inline-flex max-w-36 shrink-0 items-center gap-1 rounded-full bg-neutral-100 py-0.5 pr-2 text-[11px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 ${
-        first.logo_path ? 'pl-0.5' : 'pl-2'
-      }`}
-    >
-      {first.logo_path && (
-        <img src={logoUrl(first.logo_path)!} alt="" crossOrigin="anonymous" className="h-3.5 w-3.5 shrink-0 rounded-full" loading="lazy" />
-      )}
-      <span className="truncate">{first.name}</span>
-      {rest.length > 0 && <span className="shrink-0 text-neutral-400">+{rest.length}</span>}
     </span>
   )
 }

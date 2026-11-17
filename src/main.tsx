@@ -9,6 +9,7 @@ import { loadOnAirFilter } from './lib/onAir'
 import { loadDefaultView } from './lib/trackingView'
 import { loadMyServices } from './lib/services'
 import { loadPeople } from './lib/people'
+import { loadHiddenSuggestions } from './lib/suggestions'
 import { App } from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import './index.css'
@@ -20,7 +21,7 @@ applyTheme()
 if ('caches' in window) caches.delete('tmdb-images').catch(() => {})
 
 // Load per-phone settings first so Search doesn't flash the "add a key" prompt.
-Promise.all([loadTmdbKey(), loadRegion(), loadQuestionSetting(), loadOnAirFilter(), loadDefaultView(), loadMyServices(), loadPeople()])
+Promise.all([loadTmdbKey(), loadRegion(), loadQuestionSetting(), loadOnAirFilter(), loadDefaultView(), loadMyServices(), loadPeople(), loadHiddenSuggestions()])
   .catch(() => {})
   .finally(() =>
     createRoot(document.getElementById('root')!).render(

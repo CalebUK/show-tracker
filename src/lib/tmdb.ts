@@ -156,6 +156,31 @@ export async function searchShows(query: string, signal?: AbortSignal): Promise<
   return data.results
 }
 
+export interface Recommendation {
+  id: number
+  name: string
+  poster_path: string | null
+  first_air_year: string | null
+  /** TMDB's global rating, 0–10. */
+  vote_average: number
+  vote_count: number
+}
+
+/** TMDB's "people who liked this also liked" list for a show (its first 20). */
+export async function getRecommendations(tmdbId: number): Promise<Recommendation[]> {
+  const data = await get<{
+    results: { id: number; name: string; poster_path: string | null; first_air_date?: string; vote_average?: number; vote_count?: number }[]
+  }>(`/tv/${tmdbId}/recommendations`, { language: navigator.language || 'en-US' })
+  return data.results.map((r) => ({
+    id: r.id,
+    name: r.name,
+    poster_path: r.poster_path,
+    first_air_year: r.first_air_date ? r.first_air_date.slice(0, 4) : null,
+    vote_average: r.vote_average ?? 0,
+    vote_count: r.vote_count ?? 0,
+  }))
+}
+
 interface TmdbDetails {
   id: number
   name: string

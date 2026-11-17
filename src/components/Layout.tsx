@@ -1,15 +1,17 @@
 import type { ReactNode } from 'react'
+import type { Provider } from '../db'
 import { BackIcon, PlayIcon, RankIcon, SearchIcon, SettingsIcon, TvIcon } from './Icons'
 import { goBack, navigate, type Tab } from '../lib/router'
 import { toastStore } from '../lib/toast'
 import { isIOS, isStandalone } from '../lib/install'
+import { logoUrl } from '../lib/tmdb'
 
-/** Sticky title bar for a tab screen. */
-export function ScreenHeader({ title, right, children }: { title: string; right?: ReactNode; children?: ReactNode }) {
+/** Sticky title bar for a tab screen. `title` is usually text; Rankings passes its Rankings / Suggestions switch. */
+export function ScreenHeader({ title, right, children }: { title: ReactNode; right?: ReactNode; children?: ReactNode }) {
   return (
     <header className="pt-safe sticky top-0 z-10 bg-white/85 backdrop-blur-md dark:bg-neutral-950/85">
       <div className="flex h-14 items-center justify-between px-5">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        {typeof title === 'string' ? <h1 className="text-2xl font-semibold tracking-tight">{title}</h1> : title}
         <div className="flex items-center gap-1">{right}</div>
       </div>
       {children}
@@ -62,6 +64,24 @@ export function Overlay({ title, children, fallback = '/' }: { title?: string; c
       </header>
       <div className="pb-safe mx-auto max-w-xl">{children}</div>
     </div>
+  )
+}
+
+/** Where to watch it: the first of your services it's on, with "+1" for any more. */
+export function ServicePill({ services }: { services: Provider[] }) {
+  const [first, ...rest] = services
+  return (
+    <span
+      className={`inline-flex max-w-36 shrink-0 items-center gap-1 rounded-full bg-neutral-100 py-0.5 pr-2 text-[11px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 ${
+        first.logo_path ? 'pl-0.5' : 'pl-2'
+      }`}
+    >
+      {first.logo_path && (
+        <img src={logoUrl(first.logo_path)!} alt="" crossOrigin="anonymous" className="h-3.5 w-3.5 shrink-0 rounded-full" loading="lazy" />
+      )}
+      <span className="truncate">{first.name}</span>
+      {rest.length > 0 && <span className="shrink-0 text-neutral-400">+{rest.length}</span>}
+    </span>
   )
 }
 
