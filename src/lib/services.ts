@@ -33,6 +33,16 @@ export function sameService(a: Provider, b: Provider) {
   return x.length >= 3 ? y.startsWith(x) : x === y
 }
 
+/**
+ * A channel and a service that are the same brand, so there's no need to show both: "Netflix" and
+ * "Netflix", "Prime Video" and "Amazon Prime Video", "Apple TV+" and "Apple TV". Short names
+ * (Channel 5 is "5") only match exactly.
+ */
+export function sameBrand(channel: string, service: Provider) {
+  const [x, y] = [norm(channel), norm(service.name)].sort((p, q) => p.length - q.length)
+  return x.length >= 3 ? y.includes(x) : x === y
+}
+
 /** Drops variants of a service that's also listed, keeping the main one. Order is kept. */
 export function foldVariants(list: Provider[]) {
   return list.filter(

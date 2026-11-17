@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Provider, Show } from '../db'
-import { canStream, foldVariants, sameService, servicesOnShows, whereToWatch } from './services'
+import { canStream, foldVariants, sameBrand, sameService, servicesOnShows, whereToWatch } from './services'
 
 const p = (id: number, name: string): Provider => ({ id, name, logo_path: null })
 const netflix = p(8, 'Netflix')
@@ -30,6 +30,16 @@ describe('sameService', () => {
   it('only matches very short names exactly', () => {
     expect(sameService(five, p(999, '5 Select'))).toBe(false)
     expect(sameService(five, p(1000, '5'))).toBe(true)
+  })
+})
+
+describe('sameBrand', () => {
+  it("spots a channel that's the same as a service", () => {
+    expect(sameBrand('Netflix', netflix)).toBe(true)
+    expect(sameBrand('Prime Video', prime)).toBe(true)
+    expect(sameBrand('Apple TV+', p(350, 'Apple TV'))).toBe(true)
+    expect(sameBrand('BBC One', iplayer)).toBe(false)
+    expect(sameBrand('5', p(1, '5 Select'))).toBe(false)
   })
 })
 

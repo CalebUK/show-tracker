@@ -8,7 +8,7 @@ import { getTmdbKey, logoUrl } from '../lib/tmdb'
 import { isOnCurrentSeason, onAirFilterStore } from '../lib/onAir'
 import { defaultViewStore, type TrackingView } from '../lib/trackingView'
 import { peopleStore, type Person } from '../lib/people'
-import { myServicesStore, servicesFor } from '../lib/services'
+import { myServicesStore, sameBrand, servicesFor } from '../lib/services'
 import { navigate } from '../lib/router'
 import { errorMessage, toast } from '../lib/toast'
 import { isWatched, useLibrary } from '../hooks/useLibrary'
@@ -226,6 +226,7 @@ export function Tracking() {
                         show={show}
                         detail={`${episodeLabel([ep])} · ${formatAirTime(ep, 'later')}`}
                         progress={progress(show)}
+                        withChannel
                       />
                     )
                   })}
@@ -234,7 +235,7 @@ export function Tracking() {
               {data.undated.length > 0 && (
                 <Collapsible title="Still Cooking" subtitle="In production, no date yet" count={data.undated.length}>
                   {data.undated.map((show) => (
-                    <QuietRow key={show.tmdb_id} show={show} detail={nextSeasonNote(show)} progress={progress(show)} />
+                    <QuietRow key={show.tmdb_id} show={show} detail={nextSeasonNote(show)} progress={progress(show)} withChannel />
                   ))}
                 </Collapsible>
               )}
@@ -278,17 +279,21 @@ function QuietRow({
   detail,
   progress,
   airing = false,
+  withChannel = false,
 }: {
   show: Show
   detail: string
   /** When given, adds a line saying how far behind you are. */
   progress?: Progress
   airing?: boolean
+  /** On air: show the channel it's on. */
+  withChannel?: boolean
 }) {
   const behind = progress?.started && progress.left > 0
   const catchUp = progress && catchUpLine(progress)
   const person = usePerson(show)
   const services = useMyServices(show)
+  const channel = withChannel ? channelFor(show, services) : null
   return (
     <li className="list-none">
       <button
@@ -299,8 +304,9 @@ function QuietRow({
         <div className="min-w-0 flex-1">
           <ShowName name={show.name} className="text-neutral-700 dark:text-neutral-200" />
           <div className="truncate text-sm text-neutral-500 tabular-nums dark:text-neutral-400">{detail}</div>
-          {(catchUp || airing || person || services.length > 0) && (
+          {(catchUp || airing || person || services.length > 0 || channel) && (
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums">
+              {channel && <ChannelPill name={channel} />}
               {person && <PersonPill name={person.name} />}
               {services.length > 0 && <ServicePill services={services} />}
               {airing && <AiringPill />}
@@ -330,6 +336,7 @@ function EpisodeRow({ row, group, now }: { row: UpcomingRow; group: keyof Upcomi
   const title = row.episodes.length > 1 ? `${row.episodes.length} episodes` : ep.name
   const person = usePerson(row.show)
   const services = useMyServices(row.show)
+  const channel = channelFor(row.show, services)
   return (
     <li className="flex items-center gap-2 pr-4">
       <button
@@ -343,8 +350,9 @@ function EpisodeRow({ row, group, now }: { row: UpcomingRow; group: keyof Upcomi
             <span className="tabular-nums">{episodeLabel(row.episodes)}</span>
             {title ? ` · ${title}` : ''}
           </div>
-          {(person || services.length > 0) && (
+          {(person || services.length > 0 || channel) && (
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              {channel && <ChannelPill name={channel} />}
               {person && <PersonPill name={person.name} />}
               {services.length > 0 && <ServicePill services={services} />}
             </div>
@@ -424,6 +432,22 @@ function usePerson(show: Show): Person | null {
 /** Your services a show is on (Settings → Streaming services). */
 function useMyServices(show: Show): Provider[] {
   return servicesFor(show, myServicesStore.use())
+}
+
+/** The channel a show airs on (TMDB's network, e.g. "BBC One"), unless it's one of the service pills already shown. */
+function channelFor(show: Show, services: Provider[]) {
+  const channel = show.network
+  if (!channel || services.some((s) => sameBrand(channel, s))) return null
+  return channel
+}
+
+/** On air: the channel it's on. Outlined, so it reads differently from the person and service pills. */
+function ChannelPill({ name }: { name: string }) {
+  return (
+    <span className="max-w-36 shrink-0 truncate rounded-full border border-neutral-200 px-2 py-px text-[11px] font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
+      {name}
+    </span>
+  )
 }
 
 /** Where to watch it: the first of your services it's on, with "+1" for any more. */
