@@ -1,13 +1,14 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import type { Episode, Show } from '../db'
+import type { Episode, Provider, Show } from '../db'
 import { addMonths, episodeLabel, formatAirTime, formatShortDate, groupUpcoming, startOfDay, type UpcomingGroups, type UpcomingRow } from '../lib/dates'
 import { isAired, isFinished, isInProduction, nextSeasonNote, type Progress } from '../lib/progress'
 import { refreshFollowed, refreshStore } from '../lib/shows'
 import { setWatched } from '../lib/watched'
-import { getTmdbKey } from '../lib/tmdb'
+import { getTmdbKey, logoUrl } from '../lib/tmdb'
 import { isOnCurrentSeason, onAirFilterStore } from '../lib/onAir'
 import { defaultViewStore, type TrackingView } from '../lib/trackingView'
 import { peopleStore, type Person } from '../lib/people'
+import { myServicesStore, servicesFor } from '../lib/services'
 import { navigate } from '../lib/router'
 import { errorMessage, toast } from '../lib/toast'
 import { isWatched, useLibrary } from '../hooks/useLibrary'
@@ -287,6 +288,7 @@ function QuietRow({
   const behind = progress?.started && progress.left > 0
   const catchUp = progress && catchUpLine(progress)
   const person = usePerson(show)
+  const services = useMyServices(show)
   return (
     <li className="list-none">
       <button
@@ -297,9 +299,10 @@ function QuietRow({
         <div className="min-w-0 flex-1">
           <ShowName name={show.name} className="text-neutral-700 dark:text-neutral-200" />
           <div className="truncate text-sm text-neutral-500 tabular-nums dark:text-neutral-400">{detail}</div>
-          {(catchUp || airing || person) && (
-            <div className="mt-0.5 flex items-center gap-2 text-xs tabular-nums">
+          {(catchUp || airing || person || services.length > 0) && (
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums">
               {person && <PersonPill name={person.name} />}
+              {services.length > 0 && <ServicePill services={services} />}
               {airing && <AiringPill />}
               {catchUp && <span className={behind ? 'font-medium text-accent-text' : 'text-neutral-400'}>{catchUp}</span>}
             </div>
@@ -326,6 +329,7 @@ function EpisodeRow({ row, group, now }: { row: UpcomingRow; group: keyof Upcomi
   const aired = row.episodes.every((e) => isAired(e, now))
   const title = row.episodes.length > 1 ? `${row.episodes.length} episodes` : ep.name
   const person = usePerson(row.show)
+  const services = useMyServices(row.show)
   return (
     <li className="flex items-center gap-2 pr-4">
       <button
@@ -339,9 +343,10 @@ function EpisodeRow({ row, group, now }: { row: UpcomingRow; group: keyof Upcomi
             <span className="tabular-nums">{episodeLabel(row.episodes)}</span>
             {title ? ` · ${title}` : ''}
           </div>
-          {person && (
-            <div className="mt-0.5 flex">
-              <PersonPill name={person.name} />
+          {(person || services.length > 0) && (
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              {person && <PersonPill name={person.name} />}
+              {services.length > 0 && <ServicePill services={services} />}
             </div>
           )}
         </div>
@@ -373,6 +378,7 @@ function UpNextRow({
   const ep = progress.next
   const left = ep && progress.started ? `${progress.left} left` : null
   const person = usePerson(show)
+  const services = useMyServices(show)
   return (
     <li className={`flex items-center gap-2 ${inPanel ? 'pr-2' : 'pr-4'}`}>
       <button
@@ -394,9 +400,10 @@ function UpNextRow({
               emptyText
             )}
           </div>
-          {(airing || left || person) && (
-            <div className="mt-0.5 flex items-center gap-2 text-xs text-neutral-400">
+          {(airing || left || person || services.length > 0) && (
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-400">
               {person && <PersonPill name={person.name} />}
+              {services.length > 0 && <ServicePill services={services} />}
               {airing && <AiringPill />}
               {left}
             </div>
@@ -412,6 +419,29 @@ function UpNextRow({
 function usePerson(show: Show): Person | null {
   const people = peopleStore.use()
   return show.person ? (people.find((p) => p.id === show.person) ?? null) : null
+}
+
+/** Your services a show is on (Settings → Streaming services). */
+function useMyServices(show: Show): Provider[] {
+  return servicesFor(show, myServicesStore.use())
+}
+
+/** Where to watch it: the first of your services it's on, with "+1" for any more. */
+function ServicePill({ services }: { services: Provider[] }) {
+  const [first, ...rest] = services
+  return (
+    <span
+      className={`inline-flex max-w-36 shrink-0 items-center gap-1 rounded-full bg-neutral-100 py-0.5 pr-2 text-[11px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 ${
+        first.logo_path ? 'pl-0.5' : 'pl-2'
+      }`}
+    >
+      {first.logo_path && (
+        <img src={logoUrl(first.logo_path)!} alt="" crossOrigin="anonymous" className="h-3.5 w-3.5 shrink-0 rounded-full" loading="lazy" />
+      )}
+      <span className="truncate">{first.name}</span>
+      {rest.length > 0 && <span className="shrink-0 text-neutral-400">+{rest.length}</span>}
+    </span>
+  )
 }
 
 /** Long titles get two lines rather than being cut off after a few words. */
