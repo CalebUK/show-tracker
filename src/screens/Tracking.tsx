@@ -14,9 +14,10 @@ import { errorMessage, toast } from '../lib/toast'
 import { isWatched, useLibrary } from '../hooks/useLibrary'
 import { useNow } from '../hooks/useNow'
 import { useOnline } from '../hooks/useOnline'
-import { Button, Chips, EmptyState, PersonPill, ScreenHeader, ServicePill } from '../components/Layout'
+import { Button, EmptyState, PersonPill, ScreenHeader, ServicePill } from '../components/Layout'
 import { PullToRefresh } from '../components/PullToRefresh'
 import { Poster } from '../components/Poster'
+import { SwitchedView, ViewSwitch, useViewSwitch } from '../components/ViewSwitch'
 import { CheckIcon, ChevronIcon, RefreshIcon, Spinner } from '../components/Icons'
 
 const SECTIONS: { id: keyof UpcomingGroups; title: string }[] = [
@@ -45,8 +46,11 @@ export function Tracking() {
   const refresh = refreshStore.use()
   const library = useLibrary(now)
   const onAirFilter = onAirFilterStore.use()
-  const [view, setViewState] = useState<View>(lastView)
-  const setView = (v: View) => setViewState((lastView = v))
+  const { view, setView, from, swipe } = useViewSwitch(
+    VIEWS.map((v) => v.id),
+    lastView,
+    (v) => (lastView = v),
+  )
 
   const data = useMemo(() => {
     if (!library) return null
@@ -116,7 +120,7 @@ export function Tracking() {
   return (
     <>
       <ScreenHeader
-        title="Tracking"
+        title={hasShows ? <ViewSwitch views={VIEWS} value={view} onChange={setView} /> : 'Tracking'}
         right={
           hasShows ? (
             <button
@@ -130,7 +134,6 @@ export function Tracking() {
           ) : null
         }
       >
-        {hasShows && <Chips options={VIEWS} value={view} onChange={setView} />}
         {!online && (
           <p className="px-5 pb-2 text-xs text-neutral-500 dark:text-neutral-400">Offline · showing saved episodes</p>
         )}
@@ -143,104 +146,108 @@ export function Tracking() {
             body="Search for a show and follow it to see its next episodes here."
             action={<Button onClick={() => navigate('/search', { replace: true })}>Find a show</Button>}
           />
-        ) : !data ? null : view === 'watching' ? (
-          <div className="pb-6">
-            {data.upNext.length > 0 && (
-              <Section title="Up next">
-                {data.upNext.map((show) => (
-                  <UpNextRow key={show.tmdb_id} show={show} progress={progress(show)} airing={data.airingSoon.has(show.tmdb_id)} />
-                ))}
-              </Section>
-            )}
-            {(data.notStarted.length > 0 || data.caughtUp.length > 0) && (
-              <div className="mt-6 space-y-2 px-5">
-                {data.notStarted.length > 0 && (
-                  <Collapsible title="Not started" subtitle="Following, nothing watched yet" count={data.notStarted.length}>
-                    {data.notStarted.map((show) => {
-                      const next = data.nextDate.get(show.tmdb_id)
-                      return (
-                        <UpNextRow
-                          key={show.tmdb_id}
-                          show={show}
-                          progress={progress(show)}
-                          airing={data.airingSoon.has(show.tmdb_id)}
-                          emptyText={next ? `Starts ${formatShortDate(next, now)}` : nextSeasonNote(show)}
-                          inPanel
-                        />
-                      )
-                    })}
-                  </Collapsible>
-                )}
-                {data.caughtUp.length > 0 && (
-                  <Collapsible title="Caught up" subtitle="Nothing to watch until the next episode" count={data.caughtUp.length}>
-                    {data.caughtUp.map((show) => {
-                      const next = data.nextDate.get(show.tmdb_id)
+        ) : !data ? null : (
+          <SwitchedView view={view} from={from} swipe={swipe}>
+            {view === 'watching' ? (
+            <div className="pb-6">
+              {data.upNext.length > 0 && (
+                <Section title="Up next">
+                  {data.upNext.map((show) => (
+                    <UpNextRow key={show.tmdb_id} show={show} progress={progress(show)} airing={data.airingSoon.has(show.tmdb_id)} />
+                  ))}
+                </Section>
+              )}
+              {(data.notStarted.length > 0 || data.caughtUp.length > 0) && (
+                <div className="mt-6 space-y-2 px-5">
+                  {data.notStarted.length > 0 && (
+                    <Collapsible title="Not started" subtitle="Following, nothing watched yet" count={data.notStarted.length}>
+                      {data.notStarted.map((show) => {
+                        const next = data.nextDate.get(show.tmdb_id)
+                        return (
+                          <UpNextRow
+                            key={show.tmdb_id}
+                            show={show}
+                            progress={progress(show)}
+                            airing={data.airingSoon.has(show.tmdb_id)}
+                            emptyText={next ? `Starts ${formatShortDate(next, now)}` : nextSeasonNote(show)}
+                            inPanel
+                          />
+                        )
+                      })}
+                    </Collapsible>
+                  )}
+                  {data.caughtUp.length > 0 && (
+                    <Collapsible title="Caught up" subtitle="Nothing to watch until the next episode" count={data.caughtUp.length}>
+                      {data.caughtUp.map((show) => {
+                        const next = data.nextDate.get(show.tmdb_id)
+                        return (
+                          <QuietRow
+                            key={show.tmdb_id}
+                            show={show}
+                            detail={next ? `Next: ${episodeLabel([next])} · ${formatShortDate(next, now)}` : nextSeasonNote(show)}
+                            airing={data.airingSoon.has(show.tmdb_id)}
+                          />
+                        )
+                      })}
+                    </Collapsible>
+                  )}
+                </div>
+              )}
+              {data.watchingCount === 0 && (
+                <Notice>
+                  {data.finishedCount > 0
+                    ? "Nothing to watch right now. Shows you've finished are in the Shows tab under Finished."
+                    : 'Shows you follow appear here with your next episode to watch.'}
+                </Notice>
+              )}
+            </div>
+          ) : (
+            <div className="pb-6">
+              {SECTIONS.map(({ id, title }) =>
+                data.groups[id].length ? (
+                  <Section key={id} title={title}>
+                    {data.groups[id].map((row) => (
+                      <EpisodeRow key={row.key} row={row} group={id} now={now} />
+                    ))}
+                  </Section>
+                ) : null,
+              )}
+              {nothingOnAir && <Notice>Nothing in the next {SOON_MONTHS} months for the shows here.</Notice>}
+              {data.hiddenFromOnAir > 0 && (
+                <p className="px-5 pt-4 text-xs leading-relaxed text-neutral-400">
+                  {data.hiddenFromOnAir} show{data.hiddenFromOnAir === 1 ? '' : 's'} you're a season or more behind on{' '}
+                  {data.hiddenFromOnAir === 1 ? 'is' : 'are'} hidden until you reach the current season. Change this in Settings → On air.
+                </p>
+              )}
+
+              <div className="mt-8 space-y-2 px-5">
+                {data.farAway.length > 0 && (
+                  <Collapsible title="Save the Date" subtitle={`More than ${SOON_MONTHS} months away`} count={data.farAway.length}>
+                    {data.farAway.map((show) => {
+                      const ep = data.nextDate.get(show.tmdb_id)!
                       return (
                         <QuietRow
                           key={show.tmdb_id}
                           show={show}
-                          detail={next ? `Next: ${episodeLabel([next])} · ${formatShortDate(next, now)}` : nextSeasonNote(show)}
-                          airing={data.airingSoon.has(show.tmdb_id)}
+                          detail={`${episodeLabel([ep])} · ${formatAirTime(ep, 'later')}`}
+                          progress={progress(show)}
+                          withChannel
                         />
                       )
                     })}
                   </Collapsible>
                 )}
+                {data.undated.length > 0 && (
+                  <Collapsible title="Still Cooking" subtitle="In production, no date yet" count={data.undated.length}>
+                    {data.undated.map((show) => (
+                      <QuietRow key={show.tmdb_id} show={show} detail={nextSeasonNote(show)} progress={progress(show)} withChannel />
+                    ))}
+                  </Collapsible>
+                )}
               </div>
-            )}
-            {data.watchingCount === 0 && (
-              <Notice>
-                {data.finishedCount > 0
-                  ? "Nothing to watch right now. Shows you've finished are in the Shows tab under Finished."
-                  : 'Shows you follow appear here with your next episode to watch.'}
-              </Notice>
-            )}
-          </div>
-        ) : (
-          <div className="pb-6">
-            {SECTIONS.map(({ id, title }) =>
-              data.groups[id].length ? (
-                <Section key={id} title={title}>
-                  {data.groups[id].map((row) => (
-                    <EpisodeRow key={row.key} row={row} group={id} now={now} />
-                  ))}
-                </Section>
-              ) : null,
-            )}
-            {nothingOnAir && <Notice>Nothing in the next {SOON_MONTHS} months for the shows here.</Notice>}
-            {data.hiddenFromOnAir > 0 && (
-              <p className="px-5 pt-4 text-xs leading-relaxed text-neutral-400">
-                {data.hiddenFromOnAir} show{data.hiddenFromOnAir === 1 ? '' : 's'} you're a season or more behind on{' '}
-                {data.hiddenFromOnAir === 1 ? 'is' : 'are'} hidden until you reach the current season. Change this in Settings → On air.
-              </p>
-            )}
-
-            <div className="mt-8 space-y-2 px-5">
-              {data.farAway.length > 0 && (
-                <Collapsible title="Save the Date" subtitle={`More than ${SOON_MONTHS} months away`} count={data.farAway.length}>
-                  {data.farAway.map((show) => {
-                    const ep = data.nextDate.get(show.tmdb_id)!
-                    return (
-                      <QuietRow
-                        key={show.tmdb_id}
-                        show={show}
-                        detail={`${episodeLabel([ep])} · ${formatAirTime(ep, 'later')}`}
-                        progress={progress(show)}
-                        withChannel
-                      />
-                    )
-                  })}
-                </Collapsible>
-              )}
-              {data.undated.length > 0 && (
-                <Collapsible title="Still Cooking" subtitle="In production, no date yet" count={data.undated.length}>
-                  {data.undated.map((show) => (
-                    <QuietRow key={show.tmdb_id} show={show} detail={nextSeasonNote(show)} progress={progress(show)} withChannel />
-                  ))}
-                </Collapsible>
-              )}
             </div>
-          </div>
+            )}
+          </SwitchedView>
         )}
       </PullToRefresh>
     </>
