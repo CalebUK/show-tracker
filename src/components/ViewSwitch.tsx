@@ -5,7 +5,7 @@ type SwipeHandlers = { onTouchStart: (e: TouchEvent) => void; onTouchEnd: (e: To
 
 /**
  * A tab's views, switched from its title: the chosen one big, the others small, swapping sizes as
- * you tap. Tracking (Watching / On air) and Rankings (Rankings / Suggestions).
+ * you tap. Tracking (Watching / On air) and Search (Search / Suggestions).
  */
 export function ViewSwitch<T extends string>({
   views,

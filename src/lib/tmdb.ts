@@ -132,7 +132,15 @@ function request(path: string, params: Record<string, string>, key: string): [UR
 async function get<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const key = getTmdbKey()
   if (!key) throw new Error('Add your TMDB key in Settings first.')
-  const res = await fetch(...request(path, params, key))
+  const [url, init] = request(path, params, key)
+  let res: Response
+  try {
+    // A time limit, so one stuck connection can't hold up a refresh forever.
+    res = await fetch(url, { ...init, signal: AbortSignal.timeout(15_000) })
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'TimeoutError') throw new Error('TMDB took too long to answer.')
+    throw err
+  }
   if (res.status === 401) throw new Error("Your TMDB key isn't working. Check it in Settings.")
   if (!res.ok) throw new Error(`TMDB ${res.status}: ${res.statusText}`)
   return res.json() as Promise<T>

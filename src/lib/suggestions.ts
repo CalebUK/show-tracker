@@ -3,7 +3,7 @@ import { createStore } from './store'
 import { getRecommendations, getShowDetails, region, type Recommendation } from './tmdb'
 
 /**
- * "Suggestions" (Rankings tab): shows you might like, from TMDB's "people who liked this also
+ * "Suggestions" (Search tab): shows you might like, from TMDB's "people who liked this also
  * liked" lists for the shows you rated well, pushed down if they come up alongside ones you didn't
  * like, and weighted by TMDB's global rating.
  */

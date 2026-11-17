@@ -4,10 +4,32 @@ const API = 'https://api.tvmaze.com'
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-/** TVmaze allows roughly 20 calls per 10 seconds; back off and retry on 429. */
+/** Give up on a request after this long, so one stuck connection can't hold up a refresh forever. */
+const TIMEOUT_MS = 15_000
+
+/**
+ * TVmaze allows roughly 20 calls per 10 seconds. Calls are spaced out to stay under that even when
+ * several shows refresh at once, and a 429 still backs off and retries.
+ */
+const GAP_MS = 550
+let nextSlot = 0
+async function waitForSlot() {
+  const now = Date.now()
+  const wait = Math.max(0, nextSlot - now)
+  nextSlot = Math.max(now, nextSlot) + GAP_MS
+  if (wait) await sleep(wait)
+}
+
 async function get<T>(path: string): Promise<T | null> {
   for (let attempt = 0; attempt < 4; attempt++) {
-    const res = await fetch(API + path)
+    await waitForSlot()
+    let res: Response
+    try {
+      res = await fetch(API + path, { signal: AbortSignal.timeout(TIMEOUT_MS) })
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'TimeoutError') throw new Error('TVmaze took too long to answer.')
+      throw err
+    }
     if (res.status === 404) return null
     if (res.status === 429) {
       await sleep(2000 * (attempt + 1))

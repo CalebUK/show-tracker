@@ -6,7 +6,7 @@ import { toastStore } from '../lib/toast'
 import { isIOS, isStandalone } from '../lib/install'
 import { logoUrl } from '../lib/tmdb'
 
-/** Sticky title bar for a tab screen. `title` is usually text; Rankings passes its Rankings / Suggestions switch. */
+/** Sticky title bar for a tab screen. `title` is usually text; Tracking and Search pass their view switch. */
 export function ScreenHeader({ title, right, children }: { title: ReactNode; right?: ReactNode; children?: ReactNode }) {
   return (
     <header className="pt-safe sticky top-0 z-10 bg-white/85 backdrop-blur-md dark:bg-neutral-950/85">

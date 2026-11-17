@@ -3,35 +3,12 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Bucket, type Ranking, type Show } from '../db'
 import { BUCKETS, sortRankings } from '../lib/ranking'
 import { navigate } from '../lib/router'
-import { myServicesStore } from '../lib/services'
 import { Button, Chips, EmptyState, ScreenHeader } from '../components/Layout'
 import { Poster } from '../components/Poster'
-import { SwitchedView, ViewSwitch, useViewSwitch } from '../components/ViewSwitch'
 import { ReadyToRank } from './RankFlow'
-import { Suggestions } from './Suggestions'
-
-type View = 'rankings' | 'suggestions'
-const VIEWS: { id: View; label: string }[] = [
-  { id: 'rankings', label: 'Rankings' },
-  { id: 'suggestions', label: 'Suggestions' },
-]
-type SuggestionFilter = 'all' | 'mine'
-
-// Kept outside the component so switching tabs doesn't reset them.
-let lastView: View = 'rankings'
-let lastSuggestionFilter: SuggestionFilter = 'all'
 
 export function Rankings() {
-  const { view, setView, from, swipe } = useViewSwitch(
-    VIEWS.map((v) => v.id),
-    lastView,
-    (v) => (lastView = v),
-  )
-
   const [filter, setFilter] = useState<Bucket | 'all'>('all')
-  const [suggestionFilter, setSuggestionFilterState] = useState(lastSuggestionFilter)
-  const setSuggestionFilter = (f: SuggestionFilter) => setSuggestionFilterState((lastSuggestionFilter = f))
-  const myServices = myServicesStore.use()
 
   const rows = useLiveQuery(async () => {
     const rankings = (await db.rankings.toArray()).sort(sortRankings)
@@ -43,9 +20,9 @@ export function Rankings() {
   return (
     <>
       <ScreenHeader
-        title={<ViewSwitch views={VIEWS} value={view} onChange={setView} />}
+        title="Rankings"
         right={
-          view === 'rankings' && rows && rows.length >= 2 ? (
+          rows && rows.length >= 2 ? (
             <button
               onClick={() => navigate('/compare')}
               className="h-8 shrink-0 rounded-full bg-accent/10 px-3 text-sm font-medium text-accent-text active:opacity-70 dark:bg-accent/20"
@@ -55,27 +32,10 @@ export function Rankings() {
           ) : null
         }
       >
-        {view === 'rankings'
-          ? rows && rows.length > 0 && <Chips options={chips} value={filter} onChange={setFilter} />
-          : myServices.length > 0 && (
-              <Chips
-                options={[
-                  { id: 'all', label: 'All' },
-                  { id: 'mine', label: 'On my services' },
-                ]}
-                value={suggestionFilter}
-                onChange={setSuggestionFilter}
-              />
-            )}
+        {rows && rows.length > 0 && <Chips options={chips} value={filter} onChange={setFilter} />}
       </ScreenHeader>
 
-      <SwitchedView view={view} from={from} swipe={swipe}>
-        {view === 'rankings' ? (
-          <RankingsList rows={rows} filter={filter} />
-        ) : (
-          <Suggestions onlyMine={myServices.length > 0 && suggestionFilter === 'mine'} />
-        )}
-      </SwitchedView>
+      <RankingsList rows={rows} filter={filter} />
     </>
   )
 }

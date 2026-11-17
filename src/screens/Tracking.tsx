@@ -137,6 +137,11 @@ export function Tracking() {
         {!online && (
           <p className="px-5 pb-2 text-xs text-neutral-500 dark:text-neutral-400">Offline · showing saved episodes</p>
         )}
+        {online && refresh.running && refresh.total > 1 && (
+          <p className="px-5 pb-2 text-xs text-neutral-500 tabular-nums dark:text-neutral-400">
+            Updating shows · {refresh.done} of {refresh.total}
+          </p>
+        )}
       </ScreenHeader>
 
       <PullToRefresh onRefresh={forceRefresh}>

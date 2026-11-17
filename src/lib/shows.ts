@@ -1,12 +1,13 @@
 import { db, hasTicks, isOwned, type Episode, type Show } from '../db'
 import { localMidnight } from './dates'
 import { getShowDetails, getTmdbEpisodes, getTmdbKey, type ShowDetails } from './tmdb'
-import { getEpisodes, lookupTvmazeId, sleep } from './tvmaze'
+import { getEpisodes, lookupTvmazeId } from './tvmaze'
 import { createStore } from './store'
 import { errorMessage } from './toast'
 
 export const STALE_MS = 12 * 60 * 60 * 1000
-const DELAY_BETWEEN_SHOWS_MS = 600
+/** Shows refreshed at once. TVmaze calls are spaced out in tvmaze.ts, so this mainly overlaps the waiting. */
+const REFRESH_AT_ONCE = 4
 
 function fromDetails(details: ShowDetails): Show {
   return { ...details.show, tvmaze_id: null, followed: false, followed_at: null, last_refreshed_at: null }
@@ -103,13 +104,19 @@ export async function refreshShow(tmdbId: number, prefetched?: ShowDetails) {
   })
 }
 
-export const refreshStore = createStore<{ running: boolean; error: string | null }>({ running: false, error: null })
+/** Whether a refresh is running, how far it's got (`done` of `total` shows), and the last error. */
+export const refreshStore = createStore<{ running: boolean; error: string | null; done: number; total: number }>({
+  running: false,
+  error: null,
+  done: 0,
+  total: 0,
+})
 let inFlight: Promise<void> | null = null
 
 const isStale = (s: Show) => !s.last_refreshed_at || Date.now() - Date.parse(s.last_refreshed_at) > STALE_MS
 
 /**
- * Refresh followed shows one at a time, with a pause between each to respect rate limits.
+ * Refresh followed shows a few at a time (TVmaze's rate limit is respected in tvmaze.ts).
  * By default only shows older than 12 hours; `force` refreshes everything.
  */
 export function refreshFollowed({ force = false } = {}): Promise<void> {
@@ -119,21 +126,29 @@ export function refreshFollowed({ force = false } = {}): Promise<void> {
   inFlight = (async () => {
     const shows = (await db.shows.toArray()).filter((s) => s.followed && (force || isStale(s)))
     if (shows.length === 0) return
-    refreshStore.set({ running: true, error: null })
+    const total = shows.length
+    let next = 0
+    let done = 0
     let error: string | null = null
-    for (let i = 0; i < shows.length; i++) {
-      try {
-        await refreshShow(shows[i].tmdb_id)
-      } catch (err) {
-        error = errorMessage(err)
-        if (!navigator.onLine) break
+    let stop = false
+    refreshStore.set({ running: true, error: null, done, total })
+    const worker = async () => {
+      while (!stop && next < total) {
+        const show = shows[next++]
+        try {
+          await refreshShow(show.tmdb_id)
+        } catch (err) {
+          error = errorMessage(err)
+          if (!navigator.onLine) stop = true
+        }
+        refreshStore.set({ running: true, error: null, done: ++done, total })
       }
-      if (i < shows.length - 1) await sleep(DELAY_BETWEEN_SHOWS_MS)
     }
-    refreshStore.set({ running: false, error })
+    await Promise.all(Array.from({ length: Math.min(REFRESH_AT_ONCE, total) }, worker))
+    refreshStore.set({ running: false, error, done, total })
   })().finally(() => {
     inFlight = null
-    if (refreshStore.get().running) refreshStore.set({ running: false, error: refreshStore.get().error })
+    if (refreshStore.get().running) refreshStore.set({ ...refreshStore.get(), running: false })
   })
   return inFlight
 }

@@ -23,7 +23,7 @@ import { CloseIcon, Spinner } from '../components/Icons'
 // Kept between visits, so the list shows straight away while it's brought up to date.
 let lastResult: SuggestionsResult | null = null
 
-/** Rankings → Suggestions: shows you might like, built from your rankings (see lib/suggestions). */
+/** Search → Suggestions: shows you might like, built from your rankings (see lib/suggestions). */
 export function Suggestions({ onlyMine }: { onlyMine: boolean }) {
   const tmdbKey = useTmdbKey()
   const hidden = hiddenSuggestionsStore.use()
@@ -138,8 +138,12 @@ function SuggestionRow({ suggestion: s, services }: { suggestion: Suggestion; se
         <Poster path={s.poster_path} name={s.name} size="sm" />
         <div className="min-w-0 flex-1">
           <div className="line-clamp-2 text-[15px] leading-snug font-medium [overflow-wrap:anywhere]">{s.name}</div>
-          <div className="text-sm text-neutral-500 tabular-nums dark:text-neutral-400">
-            {[s.first_air_year, `★ ${s.vote_average.toFixed(1)}`].filter(Boolean).join(' · ')}
+          <div className="flex items-center gap-2 text-sm text-neutral-500 tabular-nums dark:text-neutral-400">
+            {s.first_air_year && <span>{s.first_air_year}</span>}
+            {/* Labelled, so TMDB's rating isn't mistaken for one of your own scores. */}
+            <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+              TMDB ★ {s.vote_average.toFixed(1)}
+            </span>
           </div>
           <div className="line-clamp-2 text-xs text-neutral-500 dark:text-neutral-400">{becauseLine(s.because)}</div>
           {services.length > 0 && (

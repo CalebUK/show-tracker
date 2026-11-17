@@ -7,19 +7,39 @@ import { followAndWatchAll } from '../lib/watched'
 import { navigate } from '../lib/router'
 import { errorMessage, toast } from '../lib/toast'
 import { useOnline } from '../hooks/useOnline'
-import { IosInstallNote, ScreenHeader, Sheet } from '../components/Layout'
+import { myServicesStore } from '../lib/services'
+import { Chips, IosInstallNote, ScreenHeader, Sheet } from '../components/Layout'
 import { TmdbKeyForm, TmdbKeyHelp } from '../components/TmdbKeyForm'
 import { Poster } from '../components/Poster'
 import { CheckIcon, CloseIcon, PlusIcon, SearchIcon, Spinner } from '../components/Icons'
+import { SwitchedView, ViewSwitch, useViewSwitch } from '../components/ViewSwitch'
+import { Suggestions } from './Suggestions'
 
-// Kept outside the component so switching tabs doesn't lose the search.
+type View = 'search' | 'suggestions'
+const VIEWS: { id: View; label: string }[] = [
+  { id: 'search', label: 'Search' },
+  { id: 'suggestions', label: 'Suggestions' },
+]
+type SuggestionFilter = 'all' | 'mine'
+
+// Kept outside the component so switching tabs doesn't lose the search (or which view you're on).
 let lastQuery = ''
 let lastResults: SearchResult[] | null = null
+let lastView: View = 'search'
+let lastSuggestionFilter: SuggestionFilter = 'all'
 
 export function Search() {
   const online = useOnline()
   const tmdbKey = useTmdbKey()
   const [query, setQuery] = useState(lastQuery)
+  const { view, setView, from, swipe } = useViewSwitch(
+    VIEWS.map((v) => v.id),
+    lastView,
+    (v) => (lastView = v),
+  )
+  const [suggestionFilter, setSuggestionFilterState] = useState(lastSuggestionFilter)
+  const setSuggestionFilter = (f: SuggestionFilter) => setSuggestionFilterState((lastSuggestionFilter = f))
+  const myServices = myServicesStore.use()
   const [results, setResults] = useState<SearchResult[] | null>(lastResults)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -62,59 +82,80 @@ export function Search() {
 
   return (
     <>
-      <ScreenHeader title="Search">
-        <div className="px-5 pb-3">
-          <label className="flex h-11 items-center gap-2 rounded-xl bg-neutral-100 px-3 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
-            <SearchIcon width={18} height={18} />
-            <input
-              type="search"
-              inputMode="search"
-              enterKeyHint="search"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              placeholder="Shows"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-              className="h-full min-w-0 flex-1 bg-transparent text-base text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100 [&::-webkit-search-cancel-button]:hidden"
+      <ScreenHeader title={<ViewSwitch views={VIEWS} value={view} onChange={setView} />}>
+        {view === 'search' ? (
+          <div className="px-5 pb-3">
+            <label className="flex h-11 items-center gap-2 rounded-xl bg-neutral-100 px-3 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+              <SearchIcon width={18} height={18} />
+              <input
+                type="search"
+                inputMode="search"
+                enterKeyHint="search"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                placeholder="Shows"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                className="h-full min-w-0 flex-1 bg-transparent text-base text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100 [&::-webkit-search-cancel-button]:hidden"
+              />
+              {loading ? (
+                <Spinner className="h-4 w-4" />
+              ) : query ? (
+                <button onClick={() => setQuery('')} aria-label="Clear search" className="p-1">
+                  <CloseIcon width={16} height={16} />
+                </button>
+              ) : null}
+            </label>
+          </div>
+        ) : (
+          myServices.length > 0 && (
+            <Chips
+              options={[
+                { id: 'all', label: 'All' },
+                { id: 'mine', label: 'On my services' },
+              ]}
+              value={suggestionFilter}
+              onChange={setSuggestionFilter}
             />
-            {loading ? (
-              <Spinner className="h-4 w-4" />
-            ) : query ? (
-              <button onClick={() => setQuery('')} aria-label="Clear search" className="p-1">
-                <CloseIcon width={16} height={16} />
-              </button>
-            ) : null}
-          </label>
-        </div>
+          )
+        )}
       </ScreenHeader>
 
-      <IosInstallNote className="mx-5 mt-2" />
+      <SwitchedView view={view} from={from} swipe={swipe}>
+        {view === 'search' ? (
+          <>
+            <IosInstallNote className="mx-5 mt-2" />
 
-      {!tmdbKey ? (
-        <div className="px-5 pt-6">
-          <h2 className="mb-2 text-[15px] font-medium">Add your TMDB key to search</h2>
-          <TmdbKeyHelp />
-          <TmdbKeyForm />
-        </div>
-      ) : !online ? (
-        <Notice>Search needs a connection.</Notice>
-      ) : error ? (
-        <Notice>{error}</Notice>
-      ) : results && results.length === 0 && !loading ? (
-        <Notice>No shows found.</Notice>
-      ) : (
-        <ul className="pb-6">
-          {results?.map((r) => (
-            <ResultRow key={r.id} result={r} followed={status?.followed.has(r.id) ?? false} score={status?.ranked.get(r.id)} />
-          ))}
-        </ul>
-      )}
+            {!tmdbKey ? (
+              <div className="px-5 pt-6">
+                <h2 className="mb-2 text-[15px] font-medium">Add your TMDB key to search</h2>
+                <TmdbKeyHelp />
+                <TmdbKeyForm />
+              </div>
+            ) : !online ? (
+              <Notice>Search needs a connection.</Notice>
+            ) : error ? (
+              <Notice>{error}</Notice>
+            ) : results && results.length === 0 && !loading ? (
+              <Notice>No shows found.</Notice>
+            ) : (
+              <ul className="pb-6">
+                {results?.map((r) => (
+                  <ResultRow key={r.id} result={r} followed={status?.followed.has(r.id) ?? false} score={status?.ranked.get(r.id)} />
+                ))}
+              </ul>
+            )}
 
-      {!results && tmdbKey && (
-        <p className="px-5 pt-6 text-xs text-neutral-400">Show data from TMDB · Schedules from TVmaze</p>
-      )}
+            {!results && tmdbKey && (
+              <p className="px-5 pt-6 text-xs text-neutral-400">Show data from TMDB · Schedules from TVmaze</p>
+            )}
+          </>
+        ) : (
+          <Suggestions onlyMine={myServices.length > 0 && suggestionFilter === 'mine'} />
+        )}
+      </SwitchedView>
     </>
   )
 }
