@@ -6,6 +6,8 @@ import { createStore } from './store'
 import { errorMessage } from './toast'
 
 export const STALE_MS = 12 * 60 * 60 * 1000
+/** Ended, cancelled and stopped shows rarely change, so they're refreshed monthly. */
+export const QUIET_STALE_MS = 30 * 24 * 60 * 60 * 1000
 /** Shows refreshed at once. TVmaze calls are spaced out in tvmaze.ts, so this mainly overlaps the waiting. */
 const REFRESH_AT_ONCE = 4
 
@@ -113,18 +115,28 @@ export const refreshStore = createStore<{ running: boolean; error: string | null
 })
 let inFlight: Promise<void> | null = null
 
-const isStale = (s: Show) => !s.last_refreshed_at || Date.now() - Date.parse(s.last_refreshed_at) > STALE_MS
+const isQuiet = (s: Show) => s.stopped === true || s.status === 'Ended' || s.status === 'Canceled'
 
 /**
- * Refresh followed shows a few at a time (TVmaze's rate limit is respected in tvmaze.ts).
- * By default only shows older than 12 hours; `force` refreshes everything.
+ * Whether a show is due a refresh. Ended, cancelled and stopped shows: once a month, even when
+ * `force`d (a pull-to-refresh). Everything else: after 12 hours, or whenever `force`d.
+ */
+export function isDue(s: Show, force: boolean, now = Date.now()) {
+  if (!s.last_refreshed_at) return true
+  const age = now - Date.parse(s.last_refreshed_at)
+  return isQuiet(s) ? age > QUIET_STALE_MS : force || age > STALE_MS
+}
+
+/**
+ * Refresh followed shows that are due (see isDue), a few at a time (TVmaze's rate limit is
+ * respected in tvmaze.ts).
  */
 export function refreshFollowed({ force = false } = {}): Promise<void> {
   if (inFlight) return inFlight
   if (!navigator.onLine || !getTmdbKey()) return Promise.resolve()
 
   inFlight = (async () => {
-    const shows = (await db.shows.toArray()).filter((s) => s.followed && (force || isStale(s)))
+    const shows = (await db.shows.toArray()).filter((s) => s.followed && isDue(s, force))
     if (shows.length === 0) return
     const total = shows.length
     let next = 0
@@ -151,6 +163,34 @@ export function refreshFollowed({ force = false } = {}): Promise<void> {
     if (refreshStore.get().running) refreshStore.set({ ...refreshStore.get(), running: false })
   })
   return inFlight
+}
+
+/**
+ * Fetch the latest "where to stream" (and TMDB's other show details, like status) for every show
+ * you follow, without the episode lists, so it's TMDB only and quick. Ended and stopped shows
+ * otherwise only update monthly. Also used after changing region or restoring a backup.
+ * Returns how many shows couldn't be updated.
+ */
+export async function refreshStreaming(onProgress?: (done: number, total: number) => void): Promise<number> {
+  const shows = (await db.shows.toArray()).filter((s) => s.followed)
+  let next = 0
+  let done = 0
+  let failed = 0
+  onProgress?.(0, shows.length)
+  const worker = async () => {
+    while (next < shows.length) {
+      const id = shows[next++].tmdb_id
+      try {
+        const { tmdb_id, ...fields } = (await getShowDetails(id, { fresh: true })).show
+        await db.shows.update(id, fields)
+      } catch {
+        failed++
+      }
+      onProgress?.(++done, shows.length)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(REFRESH_AT_ONCE, shows.length) }, worker))
+  return failed
 }
 
 /**

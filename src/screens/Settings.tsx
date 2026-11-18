@@ -8,7 +8,7 @@ import { formatDuration, timeAgo } from '../lib/dates'
 import { useLibrary } from '../hooks/useLibrary'
 import { isFinished } from '../lib/progress'
 import { useNow } from '../hooks/useNow'
-import { refreshFollowed } from '../lib/shows'
+import { refreshFollowed, refreshStreaming } from '../lib/shows'
 import { errorMessage, toast } from '../lib/toast'
 import {
   DEV_KEY,
@@ -91,7 +91,8 @@ export function Settings() {
       await applySettings(pending.settings)
       setPending(null)
       toast('Backup restored')
-      refreshFollowed({ force: true })
+      // Backups don't carry "where to stream", so fetch it for every show (ended ones too).
+      refreshFollowed({ force: true }).then(() => refreshStreaming())
     } catch (err) {
       toast(errorMessage(err))
     } finally {
@@ -328,7 +329,7 @@ function RegionSection() {
   const change = async (code: string) => {
     await setRegion(code)
     toast(`Streaming region: ${regionName(code || detected)}`)
-    refreshFollowed({ force: true })
+    refreshStreaming()
   }
 
   return (
@@ -355,6 +356,17 @@ function RegionSection() {
 
 function ServicesSection() {
   const mine = myServicesStore.use()
+  const [updating, setUpdating] = useState<{ done: number; total: number } | null>(null)
+  const updateStreaming = async () => {
+    if (!navigator.onLine) return toast("You're offline.")
+    setUpdating({ done: 0, total: 0 })
+    try {
+      const failed = await refreshStreaming((done, total) => setUpdating({ done, total }))
+      toast(failed ? `Updated, but ${failed} show${failed === 1 ? '' : 's'} couldn't be checked` : 'Where to stream is up to date')
+    } finally {
+      setUpdating(null)
+    }
+  }
   const regionCode = useRegion()
   const tmdbKey = useTmdbKey()
   const followed = useLiveQuery(() => db.shows.filter((s) => s.followed).toArray(), [])
@@ -449,6 +461,15 @@ function ServicesSection() {
           )}
         </div>
       </details>
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Button size="sm" variant="secondary" onClick={updateStreaming} disabled={updating !== null || !tmdbKey}>
+          {updating ? (updating.total ? `Updating ${updating.done} of ${updating.total}` : 'Updating…') : 'Update where to stream'}
+        </Button>
+      </div>
+      <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+        Streaming for shows that have ended, or that you've stopped watching, updates once a month. This checks every show you
+        follow now.
+      </p>
     </Section>
   )
 }

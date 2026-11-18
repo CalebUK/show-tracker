@@ -8,7 +8,7 @@ import { ratingToScore } from './elo'
 import { ratePromptStore } from './ratePrompt'
 import { addPerson, countsInStats, peopleStore, removePerson, setPeople } from './people'
 import { rankedPool, removeRanking, restoreRankings, saveComparison, saveRanking } from './ranking'
-import { refreshShow, setOwned, unfollow } from './shows'
+import { isDue, refreshShow, refreshStreaming, setOwned, unfollow } from './shows'
 import { getShowDetails, getTmdbEpisodes, type ShowDetails } from './tmdb'
 import { getEpisodes, lookupTvmazeId } from './tvmaze'
 import { setWatched } from './watched'
@@ -392,6 +392,38 @@ describe('refreshing a show', () => {
     await db.shows.update(60, { followed: false })
     await refreshShow(60)
     expect(getShowDetails).not.toHaveBeenCalled()
+  })
+})
+
+describe('how often shows refresh', () => {
+  const now = Date.parse('2026-11-18T12:00:00Z')
+  const ago = (days: number) => new Date(now - days * DAY).toISOString()
+
+  it('refreshes airing and returning shows after 12 hours, or whenever you pull down', () => {
+    expect(isDue(show(1, { status: 'Returning Series', last_refreshed_at: ago(0.25) }), false, now)).toBe(false)
+    expect(isDue(show(1, { status: 'Returning Series', last_refreshed_at: ago(0.6) }), false, now)).toBe(true)
+    expect(isDue(show(1, { status: 'Returning Series', last_refreshed_at: ago(0.1) }), true, now)).toBe(true)
+  })
+
+  it('refreshes ended, cancelled and stopped shows monthly, even when you pull down', () => {
+    expect(isDue(show(1, { status: 'Ended', last_refreshed_at: ago(5) }), true, now)).toBe(false)
+    expect(isDue(show(1, { status: 'Canceled', last_refreshed_at: ago(20) }), false, now)).toBe(false)
+    expect(isDue(show(1, { status: 'Returning Series', stopped: true, last_refreshed_at: ago(10) }), true, now)).toBe(false)
+    expect(isDue(show(1, { status: 'Ended', last_refreshed_at: ago(31) }), false, now)).toBe(true)
+    expect(isDue(show(1, { status: 'Ended', last_refreshed_at: null }), false, now)).toBe(true)
+  })
+
+  it('updates where to stream for every followed show without touching episodes', async () => {
+    await db.shows.bulkPut([show(80, { last_refreshed_at: ago(3) }), show(81, { followed: false })])
+    await db.episodes.put(ep(80, 1, 1))
+    vi.mocked(getShowDetails).mockResolvedValue(details(80))
+    const progress: string[] = []
+    expect(await refreshStreaming((done, total) => progress.push(`${done}/${total}`))).toBe(0)
+    expect((await db.shows.get(80))?.streaming).toEqual([{ id: 8, name: 'Netflix', logo_path: null }])
+    expect((await db.shows.get(80))?.last_refreshed_at).toBe(ago(3)) // episode refresh still due as before
+    expect(await db.episodes.count()).toBe(1)
+    expect(getShowDetails).toHaveBeenCalledTimes(1) // not the unfollowed one
+    expect(progress).toEqual(['0/1', '1/1'])
   })
 })
 
